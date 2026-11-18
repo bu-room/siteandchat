@@ -20,7 +20,7 @@
  *   b. 앱 키의 'REST API 키' → 아래 KAKAO_REST_API_KEY 에 붙여넣기
  *   c. 카카오 로그인 활성화 ON / Redirect URI 에 웹 앱 URL 그대로 등록
  *   d. 동의항목 → '카카오톡 메시지 전송(talk_message)' 선택 동의
- *   e. 플랫폼(제품 링크 관리) → Web 사이트 도메인에 https://bu-room.github.io 등록
+ *   e. 플랫폼(제품 링크 관리) → Web 사이트 도메인에 https://skylee-lang.github.io 등록
  *   f. (Client Secret '사용함'이면 코드 값을 KAKAO_CLIENT_SECRET 에)
  *   g. 코드 저장 → 배포 관리 → 수정(연필) → 버전: 새 버전 → 배포
  *   h. 브라우저에서  웹앱URL?setup=1  → 카카오톡 연결하기 → 테스트 메시지 오면 끝
@@ -32,7 +32,7 @@
 
 const KAKAO_REST_API_KEY  = "";            // 카카오 연결할 때 입력
 const KAKAO_CLIENT_SECRET = "";
-const SITE_URL            = "https://bu-room.github.io/siteandchat/";
+const SITE_URL            = "https://skylee-lang.github.io/wa-bang/";
 const ADMIN_PAGE_URL      = SITE_URL + "admin/";
 const LISTING_SHEET_GID   = 2138382865;    // 손님에게 공개되는 매물 탭 (CSV 주소의 gid= 값)
 const PRIVATE_SHEET_NAME  = "관리용";      // 중개사만 보는 정보 탭
