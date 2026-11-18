@@ -455,6 +455,7 @@ function relaxOptions(base){
     if(!best)return;
     const b=best, apply=()=>{extra&&extra();if(b.nd!=null)F.depMax=b.nd;if(b.nr!=null)F.rentMax=b.nr};
     const n=tryWith(apply);if(n<=base)return;
+    if(extraLabel&&out.some(o=>o.n>=n-base))return;   // 더 적게 바꾸고도 같은 수가 나오면 생략
     const money=[b.nd!=null&&b.nd>F.depMax&&`보증금 ${w(b.nd)}`,b.nr!=null&&b.nr>F.rentMax&&`월세 ${w(b.nr)}`].filter(Boolean).join(" · ");
     const label=[extraLabel,money&&money+"까지"].filter(Boolean).join(" + ");
     if(label&&!out.some(o=>o.label===label))out.push({label,n:n-base,apply});
