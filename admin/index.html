@@ -89,7 +89,10 @@ const LV={ok:["bg-emerald-50 text-emerald-700 border-emerald-200","✓"],mid:["b
 function driveThumb(u){u=u.trim();const m=u.match(/[?&]id=([\w-]+)/)||u.match(/\/d\/([\w-]+)/);return m?"https://drive.google.com/thumbnail?id="+m[1]+"&sz=w800":u}
 
 /* ---------- 화면 ---------- */
-const CHAT_LABELS=[["structure","구조"],["moveInDate","입주예정일"],["deposit","보증금"],["monthlyRent","월세"],["adminFee","관리비"],["location","위치"],["parking","주차"],["pet","반려동물"],["options","옵션"],["priority","중요하게 보는 것"],["viewingDate","방 볼 수 있는 날"]];
+const CHAT_LABELS=[["moveInDate","입주 시기"],["structure","구조"],["budget","예산"],["needs","꼭 필요한 조건"],["location","동네"],["viewingDate","방 볼 수 있는 날"],
+  ["deposit","보증금"],["monthlyRent","월세"],["adminFee","관리비"],["parking","주차"],["pet","반려동물"],["options","옵션"],["priority","중요하게 보는 것"]];
+const chatLabelsFor=c=>CHAT_LABELS.filter(([k])=>c[k]&&!(c.budget&&["deposit","monthlyRent"].includes(k))&&!(c.needs&&["pet","parking","options"].includes(k)));
+const isUrgent=c=>/즉시|1개월|이번\s*달|급/.test(String((c||{}).moveInDate||""));
 let DATA=null;
 
 function render(){
@@ -126,12 +129,12 @@ function render(){
         <div class="text-xs font-bold text-slate-500">문의 #${esc(q.id)} · ${esc(q.time)}</div>
       </div>
       <div class="flex items-center justify-between gap-2">
-        <div><div class="text-xl font-extrabold text-slate-900">${esc(q.name||"손님")}</div>
+        <div><div class="text-xl font-extrabold text-slate-900">${esc(q.name||"손님")} ${isUrgent(c)?`<span class="align-middle ml-1 px-2 py-0.5 rounded-lg bg-rose-500 text-white text-xs font-extrabold">🔥 입주 급함</span>`:""}</div>
           <button type="button" id="copyPhone" class="text-sm font-bold text-sky-700 underline">${esc(q.phone||"연락처 없음")}</button></div>
       </div>
       <div class="grid grid-cols-2 gap-2">
         <div class="p-3 rounded-2xl bg-sky-50 border border-sky-100"><div class="text-[11px] font-bold text-sky-700">📅 방 보기 가능</div><div class="text-sm font-extrabold">${esc(c.viewingDate||"-")}</div></div>
-        <div class="p-3 rounded-2xl bg-sky-50 border border-sky-100"><div class="text-[11px] font-bold text-sky-700">🚚 입주 희망</div><div class="text-sm font-extrabold">${esc(c.moveInDate||"-")}</div></div>
+        <div class="p-3 rounded-2xl ${isUrgent(c)?"bg-rose-50 border-rose-200":"bg-sky-50 border-sky-100"} border"><div class="text-[11px] font-bold ${isUrgent(c)?"text-rose-700":"text-sky-700"}">🚚 입주 희망</div><div class="text-sm font-extrabold">${esc(c.moveInDate||"-")}</div></div>
       </div>
       <div>
         <div class="text-[11px] font-bold text-slate-500 mb-1.5">처리 상태 (누르면 시트에 자동 기록)</div>
@@ -147,7 +150,7 @@ function render(){
 
     <section class="bg-white rounded-3xl border border-slate-200 p-4 shadow-sm">
       <h2 class="text-sm font-extrabold text-slate-700 mb-2">💬 희망 조건 (챗봇)</h2>
-      ${CHAT_LABELS.filter(([k])=>c[k]).length?`<dl class="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1.5 text-sm">${CHAT_LABELS.filter(([k])=>c[k]).map(([k,l])=>`<dt class="text-slate-500 font-semibold whitespace-nowrap">${l}</dt><dd class="font-bold text-slate-800">${esc(c[k])}</dd>`).join("")}</dl>`:`<p class="text-xs text-slate-500">챗봇을 거치지 않은 문의예요.</p>`}
+      ${chatLabelsFor(c).length?`<dl class="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1.5 text-sm">${chatLabelsFor(c).map(([k,l])=>`<dt class="text-slate-500 font-semibold whitespace-nowrap">${l}</dt><dd class="font-bold text-slate-800">${esc(c[k])}</dd>`).join("")}</dl>`:`<p class="text-xs text-slate-500">챗봇을 거치지 않은 문의예요.</p>`}
     </section>
 
     <section class="bg-white rounded-3xl border border-slate-200 p-4 shadow-sm">

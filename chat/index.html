@@ -84,7 +84,9 @@
       KAKAO_OPENCHAT_URL: "https://open.kakao.com/o/sPQtqVTi",   // 오픈카카오톡 1:1 채팅 링크
       INSTAGRAM_DM_URL: "https://www.instagram.com/_u/bu_room/", // 인스타 앱의 @bu_room 프로필로 바로 열기 (프로필에서 '메시지')
       INSTAGRAM_WEB_URL: "https://www.instagram.com/bu_room/",      // 컴퓨터(앱 없음)에서 열 일반 프로필 주소
-      LISTING_SITE_URL: "https://bu-room.github.io/siteandchat/" // 와방 매물 보는 사이트 주소
+      LISTING_SITE_URL: "https://bu-room.github.io/siteandchat/", // 와방 매물 보는 사이트 주소
+      // 매물 시트 CSV (동네 버튼을 자동으로 만들 때 사용, 매물 사이트와 같은 주소)
+      CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQvtWYASv36tk8-2ThheDiPSkCHeN_nc4FD99PDb5YFlMMKw_h9dGGMPadjPbUxKpu9zfuf8Tj3QJLY/pub?gid=2138382865&single=true&output=csv"
     };
   </script>
   <!-- ============================================== -->
@@ -160,7 +162,7 @@
           <span id="multiSelectCount" class="text-xs font-bold text-[#0284C7]">0개 선택됨</span>
           <button type="button" onclick="confirmMultiSelect()"
             class="px-3.5 py-1.5 rounded-lg bg-[#0284C7] text-white text-xs font-bold shadow-sm hover:bg-sky-700 transition">
-            선택 완료 <i class="ph-bold ph-check ml-0.5"></i>
+            다음 <i class="ph-bold ph-arrow-right ml-0.5"></i>
           </button>
         </div>
 
@@ -216,88 +218,94 @@
 
   <script>
     // ================= 챗봇 질문 시나리오 (11단계) =================
-    // 매물 수에 영향을 주는 질문(구조·보증금·월세·반려동물)을 먼저 묻고, 나머지는 건너뛸 수 있음
+    // 질문 5개: 입주 시기(중개사 우선순위) → 구조 → 예산 → 꼭 필요한 조건 → 동네
     const STEPS = [
+      {
+        key: "moveInDate",
+        label: "입주 시기",
+        question: "언제 입주하실 예정이세요? 📅",
+        placeholder: "예: 12월 초, 3월 중순 등 직접 입력",
+        chips: ["즉시 입주", "1개월 이내", "2~3개월 후", "아직 미정"]
+      },
       {
         key: "structure",
         label: "구조",
-        question: "먼저, 어떤 <b>구조(방 개수)</b>의 집을 찾고 계신가요? 🏠",
-        placeholder: "예: 원룸, 투룸, 복층 오피스텔 등 직접 입력",
+        question: "어떤 <b>구조</b>를 찾으세요? 🏠",
+        placeholder: "예: 복층 원룸, 분리형 원룸 등 직접 입력",
         chips: ["원룸", "투룸", "쓰리룸", "오피스텔", "아파트", "상가"]
       },
       {
-        key: "deposit",
-        label: "보증금",
-        question: "생각해 두신 <b>보증금</b> 예산은 어느 정도인가요? 💰",
-        placeholder: "예: 2,000만원, 5,000만원 등 직접 입력",
-        chips: ["500만원", "1,000만원", "3,000만원", "5,000만원", "1억 이상"]
+        key: "budget",
+        label: "예산",
+        question: "<b>예산</b>은요? 💰 <span class='text-xs text-slate-400 font-normal'>(보증금/월세, 만원)</span>",
+        placeholder: "예: 1000/70, 전세 2억",
+        chips: ["500/50 이하", "1000/60 이하", "1000/80 이하", "2000/100 이하", "전세", "매매"]
       },
       {
-        key: "monthlyRent",
-        label: "월세",
-        question: "희망하시는 <b>월세(또는 전세·매매 예산)</b> 범위를 알려주세요!",
-        placeholder: "예: 월세 60만원 이하, 전세 2억대 등",
-        chips: ["전세/매매 희망", "50만원 이하", "50~80만원", "80~120만원", "120만원 이상"]
-      },
-      {
-        key: "pet",
-        label: "반려동물 여부",
-        question: "함께 거주할 <b>반려동물 여부</b>를 알려주세요! 🐾",
-        placeholder: "예: 소형견 1마리, 고양이 2마리, 없음 등",
-        chips: ["없음", "강아지 1마리", "고양이 1마리", "기타 / 다견·다묘"]
-      },
-      {
-        key: "parking",
-        label: "주차 여부",
-        question: "<b>주차 여부</b>와 차량 종류(승용 or SUV)를 알려주세요! 🚗",
-        placeholder: "예: 주차 1대 필수 (SUV), 주차 불필요 등",
-        chips: ["주차 불필요", "필요 (승용차)", "필요 (SUV/대형)", "경차"]
+        key: "needs",
+        label: "꼭 필요한 조건",
+        question: "<b>꼭 필요한 조건</b>을 모두 골라주세요 ✨ <span class='text-xs text-slate-400 font-normal'>(여러 개 가능)</span>",
+        placeholder: "그 밖에 꼭 필요한 조건이 있으면 적어주세요",
+        multiSelect: true,
+        chips: ["🐶 강아지", "🐱 고양이", "🚗 주차", "풀옵션", "엘리베이터", "역세권", "신축급", "없어요"]
       },
       {
         key: "location",
-        label: "찾으시는 위치",
-        question: "<b>찾으시는 위치(지역/역세권)</b>를 알려주세요! 📍",
-        placeholder: "예: 역삼역 도보 10분 이내, 수지구청역 인근 등",
-        chips: ["지하철 역세권 도보 10분 이내", "조용한 주택가/공원 인근", "직장·학교 근처 (지역 직접입력)"]
-      },
-      {
-        key: "moveInDate",
-        label: "입주예정일",
-        question: "희망하시는 <b>입주예정일</b>은 언제쯤인가요? 📅",
-        placeholder: "예: 12월 중순, 즉시 입주 등 직접 입력",
-        chips: ["즉시 입주", "1개월 이내", "2~3개월 후", "날짜 협의 가능"]
-      },
-      {
-        key: "adminFee",
-        label: "관리비(포함/별도)",
-        question: "<b>관리비(포함 또는 별도 여부)</b>에 대해 선호하시는 조건이 있나요?",
-        placeholder: "예: 관리비 포함 70 이하, 별도 10만 이하 등",
-        chips: ["관리비 포함 희망", "별도 무관 (10만 이하)", "상관없음"]
-      },
-      {
-        key: "options",
-        label: "원하시는 옵션",
-        question: "<b>원하시는 옵션</b>을 모두 골라주시거나 직접 적어주세요! ✨\n<span class='text-xs text-slate-400 font-normal'>(여러 개 선택 후 '선택 완료'를 눌러주세요)</span>",
-        placeholder: "추가로 원하시는 옵션을 직접 입력하셔도 됩니다",
-        multiSelect: true,
-        chips: ["풀옵션(세탁기/냉장고/에어컨)", "건조기", "엘리베이터", "베란다/테라스", "보안/CCTV", "신축급", "특이사항 없음"]
-      },
-      {
-        key: "priority",
-        label: "중요시 보는 부분",
-        question: "<b>집 구하실 때 가장 중요시 보는 부분</b>은 무엇인가요? 👀",
-        placeholder: "예: 채광, 수압, 층간소음, 가성비 등",
-        chips: ["채광 / 남향", "조용한 주변환경", "역세권 / 교통편의", "수압 / 깔끔한 컨디션", "가성비 (금액)"]
-      },
-      {
-        key: "viewingDate",
-        label: "방 보실 수 있는 날짜",
-        question: "실제로 <b>방 보실 수 있는 날짜와 시간대</b>는 언제인가요? 🗓️",
-        placeholder: "예: 이번 주 토요일 오후 2시, 평일 저녁 7시 이후",
-        chips: ["이번 주 평일", "이번 주 주말", "언제든 가능 (시간 협의)"]
+        label: "동네",
+        question: "어느 <b>동네</b>가 좋으세요? 📍",
+        placeholder: "예: 서면역 근처, 부산대 앞 등 직접 입력",
+        chips: ["상관없어요"]   // 매물 시트에서 매물이 많은 동네를 자동으로 앞에 붙임
       }
     ];
-    const SKIP_FROM = 4;   // 4번째 질문까지 답하면 '건너뛰고 매물 보기' 표시 (매물 사이트 안에서만)
+    const SKIP_FROM = 4;   // 4번째(꼭 필요한 조건)까지 답하면 '건너뛰고 매물 보기' 표시 (매물 사이트 안에서만)
+
+    // 예산·필요조건 답을 매물 사이트/중개사 화면이 쓰는 항목(보증금·월세·반려동물·주차·옵션)으로 풀어둠
+    function deriveAnswers() {
+      ["deposit", "monthlyRent", "pet", "parking", "options"].forEach(k => delete answers[k]);
+      const b = String(answers.budget || "").replace(/,/g, "").trim();
+      if (b) {
+        if (/전세|매매/.test(b)) answers.monthlyRent = b;
+        else {
+          const m = b.match(/(\d+(?:\.\d+)?\s*(?:억\s*\d*\s*천?|천)?)\s*(?:만원?)?\s*\/\s*(\d+(?:\.\d+)?)/);
+          const ns = b.match(/\d+(?:\.\d+)?/g) || [];
+          if (m) { answers.deposit = m[1].replace(/\s/g, "") + (/억|천/.test(m[1]) ? "" : "만원"); answers.monthlyRent = m[2] + "만원 " + (/이상/.test(b) ? "이상" : "이하"); }
+          else if (ns.length >= 2) { answers.deposit = ns[0] + "만원"; answers.monthlyRent = ns[1] + "만원 이하"; }
+          else answers.monthlyRent = b;
+        }
+      }
+      const n = String(answers.needs || "");
+      if (n) {
+        const pets = [/강아지/.test(n) && "강아지", /고양이/.test(n) && "고양이"].filter(Boolean);
+        answers.pet = pets.length ? pets.join("·") : "없음";
+        if (/주차/.test(n)) answers.parking = "필요";
+        const opt = n.split(/,\s*/).map(x => x.replace(/^[^\w가-힣]+/, "").trim()).filter(x => x && !/강아지|고양이|주차|없어요/.test(x));
+        if (opt.length) answers.options = opt.join(", ");
+      }
+    }
+
+    // 매물 시트에서 매물이 많은 동네 top 6 → '동네' 질문 버튼으로 (손님이 타자 안 쳐도 되게)
+    let AREA_CHIPS = [];
+    (async function loadAreaChips() {
+      try {
+        if (!CONFIG.CSV_URL) return;
+        const t = (await (await fetch(CONFIG.CSV_URL + "&t=" + Date.now())).text()).replace(/^\uFEFF/, "");
+        const rows = []; let row = [], cur = "", q = false;
+        for (let i = 0; i < t.length; i++) { const c = t[i];
+          if (q) { if (c === '"') { if (t[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+          else if (c === '"') q = true; else if (c === ",") { row.push(cur); cur = ""; }
+          else if (c === "\n" || c === "\r") { if (c === "\r" && t[i + 1] === "\n") i++; row.push(cur); cur = ""; rows.push(row); row = []; } else cur += c; }
+        if (cur || row.length) { row.push(cur); rows.push(row); }
+        const h = (rows[0] || []).map(x => x.replace(/\s/g, "")), ai = h.indexOf("지역"), si = h.indexOf("상태");
+        if (ai < 0) return;
+        const cnt = {};
+        rows.slice(1).forEach(r => { if (si >= 0 && /완료|삭제/.test(r[si] || "")) return;
+          const parts = String(r[ai] || "").trim().split(/\s+/), d = parts[parts.length - 1]; if (d) cnt[d] = (cnt[d] || 0) + 1; });
+        AREA_CHIPS = Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([d]) => d);
+        const loc = STEPS.find(s => s.key === "location");
+        loc.chips = [...AREA_CHIPS, "상관없어요"];
+        if (STEPS[currentStepIdx] === loc) renderQuickChips(loc.chips, false);
+      } catch (e) {}
+    })();
 
     // ================= 내장 브라우저(카톡/인스타 안) 감지 =================
     const UA = navigator.userAgent;
@@ -500,15 +508,14 @@
       window.__greeted = true;
       updateProgress();
 
+      // 인사와 첫 질문을 바로 이어서 (시작 버튼 없이)
       await appendBotMessage(
         (EMBED
-          ? "안녕하세요! <b>와방 도우미</b>예요. 🐾\n\n몇 가지만 답해 주시면 <b>뒤에 있는 매물 목록이 바로바로 걸러져요.</b> 다 끝나면 마음에 드는 매물을 ♡ 담아서 중개사에게 보내주세요!"
-          : "안녕하세요! <b>와방 · 공인중개사 이하늘</b> 자동 매물 접수 챗봇입니다. 🏡\n\n원하시는 집 조건을 1분 만에 간단히 알려주시면, 조건에 딱 맞는 실매물을 찾아 빠르게 안내해 드릴게요!" + buildInAppNotice()),
+          ? "어떤 방 찾으세요? 🐾\n5가지만 누르면 맞는 매물만 골라드려요."
+          : "안녕하세요, <b>와방 이하늘</b>입니다 🏡\n1분이면 딱 맞는 방 찾아드려요!" + buildInAppNotice()),
         220
       );
-
-      renderQuickChips(["네, 시작할게요! 🐾"], false);
-      document.getElementById("userInput").placeholder = "'네, 시작할게요!' 버튼을 눌러주세요";
+      goToStep(0);
     }
 
     function restartChat() {
@@ -582,10 +589,9 @@
     }
 
     function toggleMultiChip(chip) {
-      if (chip === "특이사항 없음") {
-        selectedMultiOptions = ["특이사항 없음"];
-      } else {
-        selectedMultiOptions = selectedMultiOptions.filter(c => c !== "특이사항 없음");
+      if (chip === "없어요") { selectedMultiOptions = []; submitAnswer("없어요"); return; }
+      {
+        selectedMultiOptions = selectedMultiOptions.filter(c => c !== "없어요");
         const idx = selectedMultiOptions.indexOf(chip);
         if (idx >= 0) selectedMultiOptions.splice(idx, 1);
         else selectedMultiOptions.push(chip);
@@ -603,7 +609,7 @@
       const combined = [...selectedMultiOptions];
       if (customVal) combined.push(customVal);
 
-      const finalAnswer = combined.length > 0 ? combined.join(", ") : "특이사항 없음";
+      const finalAnswer = combined.length > 0 ? combined.join(", ") : "없어요";
       submitAnswer(finalAnswer);
     }
 
@@ -621,12 +627,7 @@
       const inputEl = document.getElementById("userInput");
       const val = inputEl.value.trim();
 
-      if (currentStepIdx === -1) {
-        appendUserMessage(val || "네, 시작할게요! 🐾");
-        inputEl.value = "";
-        goToStep(0);
-        return;
-      }
+      if (currentStepIdx === -1) return;   // 인사 중에는 첫 질문이 뜰 때까지 대기
 
       const step = STEPS[currentStepIdx];
       if (step && step.multiSelect) {
@@ -642,6 +643,7 @@
       const step = STEPS[currentStepIdx];
       if (!step) return;
       answers[step.key] = value;
+      deriveAnswers();
       postParent("progress");
       document.getElementById("userInput").value = "";
       appendUserMessage(value, currentStepIdx);
@@ -658,17 +660,11 @@
     function buildFormattedSummaryText() {
       return [
         "[와방 · 맞춤 매물 문의 접수]",
+        `• 입주 시기: ${answers.moveInDate || "-"}`,
         `• 구조: ${answers.structure || "-"}`,
-        `• 입주예정일: ${answers.moveInDate || "-"}`,
-        `• 보증금: ${answers.deposit || "-"}`,
-        `• 월세: ${answers.monthlyRent || "-"}`,
-        `• 관리비(포함/별도): ${answers.adminFee || "-"}`,
-        `• 찾으시는 위치: ${answers.location || "-"}`,
-        `• 주차 여부: ${answers.parking || "-"}`,
-        `• 반려동물 여부: ${answers.pet || "-"}`,
-        `• 원하시는 옵션: ${answers.options || "-"}`,
-        `• 중요시 보는 부분: ${answers.priority || "-"}`,
-        `• 방 보실 수 있는 날짜: ${answers.viewingDate || "-"}`
+        `• 예산(보증금/월세): ${answers.budget || "-"}`,
+        `• 꼭 필요한 조건: ${answers.needs || "-"}`,
+        `• 동네: ${answers.location || "-"}`
       ].join("\n");
     }
 

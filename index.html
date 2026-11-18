@@ -440,7 +440,7 @@ function relaxOptions(base){
   if(F.types.size){let best=null;TYPE_WORDS.filter(t=>!F.types.has(t)).forEach(t=>{const n=tryWith(()=>F.types.add(t));if(n>base&&(!best||n>best.n))best={t,n}});
     if(best)out.push({label:`${best.t}도 같이`,n:best.n-base,apply:()=>F.types.add(best.t)})}
   if(F.deals.size){const n=tryWith(()=>F.deals.clear());if(n>base)out.push({label:"다른 거래 유형도",n:n-base,apply:()=>F.deals.clear()})}
-  if(F.kw){const n=tryWith(()=>F.kw="");if(n>base)out.push({label:`검색어 '${F.kw}' 없이`,n:n-base,apply:()=>{F.kw="";$("kw").value="";$("kwClear").classList.add("hidden")}})}
+  if(F.kw){const n=tryWith(()=>F.kw="");if(n>base)out.push({label:CHAT_ON&&CHAT&&String(CHAT.location||"").includes(F.kw)?`${F.kw} 말고 다른 동네도`:`검색어 '${F.kw}' 없이`,n:n-base,apply:()=>{F.kw="";$("kw").value="";$("kwClear").classList.add("hidden")}})}
   // 금액 두 개를 같이 올려야 나오는 경우: 다른 조건은 맞는 매물 중 '가장 적게 올리면 되는' 금액을 찾음
   const priceCombo=(extraLabel,extra)=>{
     if(F.depMax==null&&F.rentMax==null)return;
@@ -606,7 +606,11 @@ async function load(){
 /* =====================================================================
    챗봇 연동: 챗봇이 ?chat={답변 JSON} 으로 넘겨준 조건을 필터로 자동 적용
    ===================================================================== */
-const CHAT_LABELS=[["structure","구조"],["moveInDate","입주예정일"],["deposit","보증금"],["monthlyRent","월세"],["adminFee","관리비"],["location","찾으시는 위치"],["parking","주차 여부"],["pet","반려동물"],["options","원하시는 옵션"],["priority","중요시 보는 부분"],["viewingDate","방 보실 수 있는 날짜"]];
+const CHAT_LABELS=[["moveInDate","입주 시기"],["structure","구조"],["budget","예산"],["needs","꼭 필요한 조건"],["location","동네"],["viewingDate","방 보기"],
+  /* 예전 형식(질문 11개) 호환 */["deposit","보증금"],["monthlyRent","월세"],["adminFee","관리비"],["parking","주차 여부"],["pet","반려동물"],["options","옵션"],["priority","중요시 보는 부분"]];
+/* 새 형식 답이 있으면 거기서 풀어낸 항목(보증금·월세·반려동물·주차·옵션)은 중복이라 숨김 */
+const chatLabelsFor=c=>CHAT_LABELS.filter(([k])=>c[k]&&!(c.budget&&["deposit","monthlyRent"].includes(k))&&!(c.needs&&["pet","parking","options"].includes(k)));
+const isUrgent=c=>/즉시|1개월|이번\s*달|급/.test(String((c||{}).moveInDate||""));
 let CHAT=null, FROM_URL=false, CHAT_ON=false, TOKENS=[], curItem=null;
 const LS={get:k=>{try{return JSON.parse(localStorage.getItem(k)||"null")}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 (function readChat(){
@@ -623,7 +627,7 @@ function krMoney(s){
   const k=s.match(/(\d+(?:\.\d+)?)천/);if(k)return parseFloat(k[1])*1000;
   const n=s.match(/\d+(?:\.\d+)?/);return n?parseFloat(n[0]):null;
 }
-const STOP=new Set(["지하철","도보","이내","인근","근처","직장","학교","직접입력","지역","필요","불필요","승용차","희망","상관없음","없음","특이사항","조용한","주변환경","이상","이하","무관","별도","포함","관리비","가능","시간","협의","깔끔한","컨디션","금액","가성비","교통편의","대형","정도","쪽으로","있는","좋은"]);
+const STOP=new Set(["상관없어요","없어요","강아지","고양이","지하철","도보","이내","인근","근처","직장","학교","직접입력","지역","필요","불필요","승용차","희망","상관없음","없음","특이사항","조용한","주변환경","이상","이하","무관","별도","포함","관리비","가능","시간","협의","깔끔한","컨디션","금액","가성비","교통편의","대형","정도","쪽으로","있는","좋은"]);
 function chatTokens(a){
   const src=[a.location,a.options,a.priority].join(" ");
   const t=src.split(/[\s,\/()·]+/).map(s=>s.replace(/[^가-힣A-Za-z0-9]/g,"").replace(/급$/,"")).filter(s=>s.length>=2&&!STOP.has(s)&&!/^\d/.test(s));
@@ -645,8 +649,10 @@ function applyChat(){
   if(wantJ||wantS){const v=krMoney(mr.replace(/전세|매매|희망|\//g,""));if(v){if(/이상/.test(mr))F.depMin=v;else F.depMax=/억대/.test(mr)?v+9999:v}}
   else{const ns=(mr.match(/\d+(?:\.\d+)?/g)||[]).map(Number);if(ns.length){if(/이상|초과/.test(mr))F.rentMin=ns[0];else F.rentMax=ns[ns.length-1]}}
   const pet=T("pet");if(pet&&!/없/.test(pet))F.pet=true;
-  TOKENS=chatTokens(a);CHAT_ON=true;
-  ["kw","depMin","depMax","rentMin","rentMax"].forEach(i=>$(i).value=F[i]??"");$("kwClear").classList.add("hidden");
+  const loc=T("location");   // 동네 버튼(시트의 동 이름)을 고르면 그 동네로 거름
+  if(loc&&!/상관/.test(loc)){const d=[...new Set(all.map(x=>dong(x.area)).filter(Boolean))].find(d=>loc.includes(d));if(d)F.kw=d}
+  TOKENS=chatTokens(a).filter(t=>t!==F.kw);CHAT_ON=true;
+  ["kw","depMin","depMax","rentMin","rentMax"].forEach(i=>$(i).value=F[i]??"");$("kwClear").classList.toggle("hidden",!F.kw);
   syncRent();drawTx();drawProp();drawPet();drawQuick();render();
 }
 function drawBanner(){
@@ -658,7 +664,7 @@ function drawBanner(){
     $("reChat").onclick=applyChat;return}
   const w=v=>{const s=won(v);return /억$/.test(s)?s:s+"만"};
   const r=(x,y)=>x==null&&y==null?"":x==null?`${w(y)} 이하`:y==null?`${w(x)} 이상`:`${w(x)}~${w(y)}`;
-  const chips=[...F.types,...F.deals,F.depMin!=null||F.depMax!=null?"보증금 "+r(F.depMin,F.depMax):"",F.rentMin!=null||F.rentMax!=null?"월세 "+r(F.rentMin,F.rentMax):"",F.pet?(F.petLoose?"🐾 반려동물 가능·협의":"🐾 반려동물 가능"):""].filter(Boolean);
+  const chips=[...F.types,...F.deals,F.depMin!=null||F.depMax!=null?"보증금 "+r(F.depMin,F.depMax):"",F.rentMin!=null||F.rentMax!=null?"월세 "+r(F.rentMin,F.rentMax):"",F.pet?(F.petLoose?"🐾 반려동물 가능·협의":"🐾 반려동물 가능"):"",F.kw?"📍 "+F.kw:""].filter(Boolean);
   b.innerHTML=`<div class="p-3.5 rounded-2xl bg-gradient-to-r from-wabang-600 to-sky-500 text-white shadow-md shadow-sky-200">
     <div class="flex items-center justify-between gap-2 mb-2"><div class="text-sm font-extrabold flex items-center gap-1.5"><i class="ph-fill ph-paw-print text-lg"></i> 알려주신 조건에 맞는 매물</div>
       <div class="shrink-0 flex gap-1"><button type="button" onclick="openHelper()" class="text-[11px] font-bold bg-white text-wabang-600 px-2.5 py-1 rounded-full">조건 수정</button><button type="button" id="chatOff" class="text-[11px] font-bold bg-white/20 px-2.5 py-1 rounded-full">전체 보기</button></div></div>
@@ -701,23 +707,23 @@ $("mPick").onclick=()=>curItem&&togglePick(curItem.id);
 const itemLink=x=>location.origin+location.pathname+"?item="+encodeURIComponent(x.id);
 let VIEW="";   // 도우미에서 건너뛴 경우 보내기 창에서 고르는 '방 볼 수 있는 날'
 const getChat=()=>{const c=Object.assign({},CHAT||{});if(VIEW&&!c.viewingDate)c.viewingDate=VIEW;return c};
-function chatLines(){const c=getChat();return CHAT_LABELS.filter(([k])=>c[k]).map(([k,l])=>`• ${l}: ${c[k]}`)}
+function chatLines(){const c=getChat();return chatLabelsFor(c).map(([k,l])=>`• ${l}: ${c[k]}`)}
 /* 중개사가 링크를 안 열어도 한눈에 판단할 수 있는 한 줄 요약: "전포동 투룸 · 500/55 · 3층 남향 · 🐾가능" */
 const dong=a=>{const p=String(a||"").trim().split(/\s+/);return p[p.length-1]||""};
 const shortPrice=o=>RENT_DEALS.includes(o.deal)?`${o.deal==="월세"?"":o.deal+" "}${won(o.dep)}/${won(o.rent)}`:`${o.deal} ${o.dep?won(o.dep):"문의"}`;
 const itemShort=x=>[`${dong(x.area)} ${x.types[0]||x.type}`.trim(),x.offers.map(shortPrice).join(", "),
   [floorText(x.floor),x.dir].filter(Boolean).join(" "),x.pet&&"🐾"+x.pet].filter(Boolean).join(" · ");
 const condShort=c=>[c.structure,c.deposit&&"보증금 "+c.deposit,c.monthlyRent&&(/전세|매매/.test(c.monthlyRent)?c.monthlyRent:"월세 "+c.monthlyRent),
-  c.parking&&!/불필요/.test(c.parking)?"주차 "+c.parking.replace(/필요\s*/,""):"",c.pet&&!/없/.test(c.pet)?"🐾"+c.pet:"",c.location].filter(Boolean).join(" · ");
+  c.parking&&!/불필요/.test(c.parking)?("주차 "+c.parking.replace(/필요\s*/,"")).trim():"",c.pet&&!/없/.test(c.pet)?"🐾"+c.pet:"",c.location].filter(Boolean).join(" · ");
 function buildMsg(){
   const N="①②③④⑤⑥⑦⑧⑨⑩", nm=$("sName").value.trim(), ph=$("sPhone").value.trim(), items=pickedItems(), c=getChat();
-  const L=[`🏠 [와방 문의] ${[nm,ph].filter(Boolean).join(" ")}`.trim()];
+  const L=[`🏠 [와방 문의] ${isUrgent(c)?"🔥입주 급함 ":""}${[nm,ph].filter(Boolean).join(" ")}`.trim()];
   if(c.viewingDate)L.push(`📅 방 보기: ${c.viewingDate}`);
   if(c.moveInDate)L.push(`🚚 입주: ${c.moveInDate}`);
   if(items.length){L.push(`❤️ 고른 매물 ${items.length}개`);items.forEach((x,k)=>L.push(`${N[k]||k+1+"."} #${x.id} ${itemShort(x)}`))}
   else L.push("❤️ 고른 매물 없음 (조건만 먼저 보내요)");
   const cs=condShort(c);if(cs)L.push("💬 "+cs);
-  const rest=CHAT_LABELS.filter(([k])=>c[k]&&["options","priority","adminFee"].includes(k)).map(([k,l])=>`• ${l}: ${c[k]}`);
+  const rest=chatLabelsFor(c).filter(([k])=>["options","priority","adminFee"].includes(k)).map(([k,l])=>`• ${l}: ${c[k]}`);
   if(rest.length)L.push("",...rest);
   if(items.length)L.push("","🔗 매물 사진 보기",...items.map(x=>`#${x.id} ${itemLink(x)}`));
   return L.join("\n");

@@ -38,7 +38,7 @@ const LISTING_SHEET_GID   = 2138382865;    // 손님에게 공개되는 매물 �
 const PRIVATE_SHEET_NAME  = "관리용";      // 중개사만 보는 정보 탭
 const SHEET_NAME          = "문의접수";
 const STATUSES            = ["신규", "연락함", "투어예약", "계약", "보류", "종료"];
-const HEAD = ["문의번호", "접수시간", "성함", "연락처", "매물번호", "고른 매물", "방 볼 수 있는 날", "희망 조건", "처리상태", "카톡알림", "상세페이지", "메모", "열쇠", "데이터"];
+const HEAD = ["문의번호", "접수시간", "성함", "연락처", "입주 시기", "매물번호", "고른 매물", "방 볼 수 있는 날", "희망 조건", "처리상태", "카톡알림", "상세페이지", "메모", "열쇠", "데이터"];
 const C = Object.fromEntries(HEAD.map((h, i) => [h, i + 1]));   // 열 번호
 
 const PROPS = PropertiesService.getScriptProperties();
@@ -59,6 +59,7 @@ function doPost(e) {
     const sh = getSheet_();
     sh.appendRow([
       id, new Date(), clean(d.name), clean(d.phone),
+      (isUrgent_(c) ? "🔥 " : "") + clean(c.moveInDate),
       items.map(x => x.id).join(", "),
       items.map(x => `#${x.id} ${x.short || x.area}`).join("\n"),
       clean(c.viewingDate), clean(condText_(c)),
@@ -84,8 +85,8 @@ function doPost(e) {
 /* 중개사 카톡용 한눈에 보는 메시지 (200자 안쪽 목표) */
 function agentMsg_(id, d) {
   const c = d.chat || {}, items = d.items || [], N = "①②③④⑤⑥⑦⑧⑨⑩";
-  const L = [`🏠 새 문의 #${id} · ${d.name || "손님"} ${d.phone || ""}`.trim()];
-  const when = [c.viewingDate && "방 보기 " + c.viewingDate, c.moveInDate && "입주 " + c.moveInDate].filter(Boolean).join(" · ");
+  const L = [`🏠 새 문의 #${id}${isUrgent_(c) ? " 🔥입주 급함" : ""} · ${d.name || "손님"} ${d.phone || ""}`.trim()];
+  const when = [c.moveInDate && (/입주/.test(c.moveInDate) ? c.moveInDate : "입주 " + c.moveInDate), c.viewingDate && "방 보기 " + c.viewingDate].filter(Boolean).join(" · ");
   if (when) L.push("📅 " + when);
   if (items.length) { L.push(`❤️ 고른 매물 ${items.length}개`); items.forEach((x, i) => L.push(`${N[i] || i + 1 + "."} #${x.id} ${x.short || x.area}`)); }
   else L.push("❤️ 고른 매물 없음 (조건만 접수)");
@@ -97,11 +98,13 @@ function agentMsg_(id, d) {
   if (c.location && L.join("\n").length + c.location.length < 185) L.push("📍 " + c.location);   // 자리 남으면 위치까지
   return L.join("\n");
 }
+/* 입주가 한 달 안이면 '급함' → 카톡·시트·상세 페이지에 🔥 표시 (먼저 연락할 손님) */
+function isUrgent_(c) { return /즉시|1개월|이번\s*달|급/.test(String((c || {}).moveInDate || "")); }
 function condText_(c) {
   return [c.structure,
     c.deposit && "보증금 " + c.deposit,
     c.monthlyRent && (/전세|매매/.test(c.monthlyRent) ? c.monthlyRent : "월세 " + c.monthlyRent),
-    c.parking && !/불필요/.test(c.parking) ? "주차 " + c.parking.replace(/필요\s*/, "") : "",
+    c.parking && !/불필요/.test(c.parking) ? ("주차 " + c.parking.replace(/필요\s*/, "")).trim() : "",
     c.pet && !/없/.test(c.pet) ? "🐾" + c.pet : "",
     c.location
   ].filter(Boolean).join(" · ");
