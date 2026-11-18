@@ -80,7 +80,7 @@ const CONFIG = {
       <div class="flex items-center gap-2">
         <span id="countBadge" class="text-xs font-bold text-wabang-600 bg-wabang-50 border border-wabang-200 px-2.5 py-1 rounded-full whitespace-nowrap">매물 0건</span>
         <a id="callBtn" class="hidden p-1.5 rounded-full text-wabang-600 bg-wabang-50" aria-label="전화 문의"><i class="ph-fill ph-phone text-lg"></i></a>
-        <button id="resetTop" title="필터 초기화" aria-label="필터 초기화" class="p-1.5 rounded-full text-slate-400 hover:text-wabang-600 hover:bg-wabang-50"><i class="ph ph-arrows-clockwise text-lg"></i></button>
+        <button id="resetTop" title="처음부터 다시 (담은 매물·조건 초기화)" aria-label="처음부터 다시 (담은 매물·조건 초기화)" class="p-1.5 rounded-full text-slate-400 hover:text-wabang-600 hover:bg-wabang-50"><i class="ph ph-arrows-clockwise text-lg"></i></button>
       </div>
     </div>
     <div class="relative">
@@ -574,8 +574,9 @@ function resetAll(){
   ["kw","depMin","depMax","rentMin","rentMax"].forEach(i=>$(i).value="");$("kwClear").classList.add("hidden");
   syncRent();drawTx();drawProp();drawPet();drawQuick();render();
 }
-["resetTop","resetPanel","resetEmpty"].forEach(id=>$(id).onclick=resetAll);
-$("homeBtn").onclick=e=>{e.preventDefault();closeModal();resetAll();$("pricePanel").classList.add("hidden");$("chev").style.transform="";window.scrollTo({top:0,behavior:"smooth"})};
+["resetPanel","resetEmpty"].forEach(id=>$(id).onclick=resetAll);   // 금액 패널·빈 화면: 필터만 초기화
+$("resetTop").onclick=()=>resetEverything(true);                      // 상단 초기화: 담기·조건까지 처음 상태로
+$("homeBtn").onclick=e=>{e.preventDefault();closeModal();resetEverything(false);$("pricePanel").classList.add("hidden");$("chev").style.transform="";window.scrollTo({top:0,behavior:"smooth"})};
 
 /* ---------- 로딩 ---------- */
 const SAMPLE=[
@@ -812,7 +813,8 @@ function toast(m){const t=$("toast");t.textContent=m;t.classList.remove("hidden"
 const HELPER_URL="chat/?embed=1";
 function openHelper(){
   const f=$("helperFrame");
-  if(!f.getAttribute("src"))f.setAttribute("src",HELPER_URL+(CHAT?"&prefill=1":""));
+  const src=f.getAttribute("src");
+  if(!src||src==="about:blank")f.setAttribute("src",HELPER_URL+(CHAT?"&prefill=1":""));
   $("helperSheet").classList.remove("hidden");$("helperSheet").classList.add("flex");
   document.body.style.overflow="hidden";hideBubble();
 }
@@ -828,7 +830,7 @@ window.addEventListener("message",e=>{
   if(d.type==="progress"){
     const a=d.answers&&Object.keys(d.answers).length?d.answers:null;
     CHAT=a;LS.set("wabang_chat",a?{a,t:Date.now()}:null);
-    if(a)applyChat();else{resetAll();drawPickBar()}
+    if(a)applyChat();else{clearPicks();resetAll()}   // 도우미에서 '초기화' → 담은 매물도 비움
     helperPost({type:"count",n:matchCount()});
   }
   if(d.type==="done"){
@@ -841,6 +843,18 @@ window.addEventListener("message",e=>{
 });
 // 첫 방문 손님에게만 말풍선으로 도우미 안내
 setTimeout(()=>{if(!CHAT&&!LS.get("wabang_helper_seen")&&$("helperSheet").classList.contains("hidden"))$("helperBubble").classList.remove("hidden")},1500);
+
+/* 처음 상태로: 필터 + 담은 매물 + 챗봇 조건 + 도우미 대화 */
+function clearPicks(){picks.clear();savePicks();VIEW="";drawPickBar()}
+function resetEverything(notify){
+  const had=picks.size;
+  clearPicks();
+  CHAT=null;TOKENS=[];LS.set("wabang_chat",null);
+  const f=$("helperFrame");if(f.getAttribute("src"))f.setAttribute("src","about:blank");   // 다음에 열면 새 대화
+  if(location.search){try{history.replaceState(null,"",location.pathname)}catch(e){}}    // 새로고침해도 예전 조건이 다시 적용되지 않게
+  closeSend();resetAll();
+  if(notify)toast(had?`처음 상태로 초기화했어요. 담은 매물 ${had}개도 비웠어요.`:"처음 상태로 초기화했어요.");
+}
 
 load();
 </script>
