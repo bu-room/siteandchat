@@ -119,6 +119,10 @@
             </svg>
             <span class="max-[359px]:hidden">초기화</span>
           </button>
+          <button type="button" id="embedClose" onclick="postParent('close')" title="닫기"
+            class="hidden w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 items-center justify-center">
+            <i class="ph-bold ph-x text-sm"></i>
+          </button>
           <a id="headerListingLink" href="https://bu-room.github.io/siteandchat/"
             class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#0284C7] hover:bg-sky-700 text-white text-[11px] font-bold shadow-sm transition">
             <i class="ph-fill ph-house-line text-xs"></i>
@@ -131,7 +135,10 @@
       <div class="px-4 pb-2.5 bg-white/95">
         <div class="flex items-center justify-between text-[11px] font-semibold text-slate-400 mb-1">
           <span id="progressLabel">맞춤 매물 조건 접수 준비</span>
-          <span id="progressCount" class="text-[#0284C7] font-bold">0 / 11</span>
+          <span class="flex items-center gap-1.5">
+            <span id="matchPill" class="hidden px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-extrabold"></span>
+            <span id="progressCount" class="text-[#0284C7] font-bold">0 / 11</span>
+          </span>
         </div>
         <div class="w-full h-1.5 bg-sky-100 rounded-full overflow-hidden">
           <div id="progressBar" class="h-full bg-[#0284C7] rounded-full transition-all duration-300" style="width: 0%;"></div>
@@ -291,7 +298,44 @@
     const IN_KAKAO = /KAKAOTALK/i.test(UA);
     const IN_APP = IN_KAKAO || /Instagram|FBAN|FBAV|NAVER|Line\/|DaumApps/i.test(UA);
     // 아이폰 내장 브라우저에서만 안내 (입력 전에 미리 알려야 입력 내용이 안 날아감)
+    // ================= 매물 사이트 안에 '와방 도우미'로 들어간 경우 =================
+    const EMBED = new URLSearchParams(location.search).has("embed") && window.parent !== window;
+    function postParent(type, extra) {
+      if (!EMBED) return;
+      try { window.parent.postMessage(Object.assign({ wabang: true, type, answers }, extra || {}), location.origin); } catch (e) {}
+    }
+    let lastMatchCount = null;
+    window.addEventListener("message", (e) => {
+      if (e.origin !== location.origin || !e.data || !e.data.wabang) return;
+      if (e.data.type === "count") {
+        lastMatchCount = e.data.n;
+        const pill = document.getElementById("matchPill");
+        pill.textContent = `맞는 매물 ${e.data.n}개`;
+        pill.classList.toggle("hidden", !Object.keys(answers).length);
+        pill.className = pill.className.replace(/bg-\S+ text-\S+/, e.data.n ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700");
+        const btnN = document.getElementById("embedDoneCount");
+        if (btnN) btnN.textContent = e.data.n;
+      }
+      // 매물 화면에 이미 적용된 조건이 있으면 불러와서 바로 수정할 수 있게
+      if (e.data.type === "prefill" && e.data.answers && currentStepIdx === -1 && !Object.keys(answers).length) {
+        answers = Object.assign({}, e.data.answers);
+        (async () => {
+          await appendBotMessage("전에 알려주신 조건을 불러왔어요. 바꾸고 싶은 항목은 <b>'수정하기'</b>를 눌러주세요.", 100);
+          STEPS.forEach((st, i) => { if (answers[st.key]) appendUserMessage(`${st.label}: ${answers[st.key]}`, i); });
+          currentStepIdx = STEPS.length;
+          finishEmbedded(150);
+        })();
+      }
+    });
+    if (EMBED) {
+      document.addEventListener("DOMContentLoaded", () => {
+        document.getElementById("headerListingLink").classList.add("hidden");
+        const c = document.getElementById("embedClose"); c.classList.remove("hidden"); c.classList.add("inline-flex");
+      });
+    }
+
     function buildInAppNotice() {
+      if (EMBED) return "";
       if (!(IS_IOS && IN_APP)) return "";
       const href = "kakaotalk://web/openExternal?url=" + encodeURIComponent(location.href.split("#")[0]);
       return `\n\n<div class='mt-2 rounded-xl bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-800 leading-snug break-keep'><b>⚠️ 먼저 확인해 주세요!</b><br/>지금 카톡/인스타 안에서 열려 있어요. 이 상태로는 마지막에 앱 이동·복사가 안 될 수 있고, 나중에 다시 열면 입력한 내용이 사라져요.<br/>${IN_KAKAO ? `<a href='${href}' class='mt-2 block text-center py-2 rounded-lg bg-amber-500 text-white font-extrabold'>기본 브라우저(Safari)로 다시 열기</a>` : "<b>화면 아래(또는 위)의 ⋯ → 'Safari로 열기'</b>를 눌러 다시 열어주세요."}</div>`;
@@ -436,10 +480,17 @@
       hideAfterSendModal();
       const hl = document.getElementById("headerListingLink");
       if (hl) hl.href = CONFIG.LISTING_SITE_URL;
+      if (window.__chatStarted) postParent("progress");   // '초기화'를 눌렀을 때만 매물 화면 조건도 초기화
+      window.__chatStarted = true;
+      // 매물 화면에 이미 조건이 있으면 인사 대신 그 조건을 불러옴 (prefill 메시지 대기)
+      if (EMBED && !window.__greeted && new URLSearchParams(location.search).has("prefill")) { window.__greeted = true; return; }
+      window.__greeted = true;
       updateProgress();
 
       await appendBotMessage(
-        "안녕하세요! <b>와방 · 공인중개사 이하늘</b> 자동 매물 접수 챗봇입니다. 🏡\n\n원하시는 집 조건을 1분 만에 간단히 알려주시면, 조건에 딱 맞는 실매물을 찾아 빠르게 안내해 드릴게요!" + buildInAppNotice(),
+        (EMBED
+          ? "안녕하세요! <b>와방 도우미</b>예요. 🐾\n\n몇 가지만 답해 주시면 <b>뒤에 있는 매물 목록이 바로바로 걸러져요.</b> 다 끝나면 마음에 드는 매물을 ♡ 담아서 중개사에게 보내주세요!"
+          : "안녕하세요! <b>와방 · 공인중개사 이하늘</b> 자동 매물 접수 챗봇입니다. 🏡\n\n원하시는 집 조건을 1분 만에 간단히 알려주시면, 조건에 딱 맞는 실매물을 찾아 빠르게 안내해 드릴게요!" + buildInAppNotice()),
         220
       );
 
@@ -578,6 +629,7 @@
       const step = STEPS[currentStepIdx];
       if (!step) return;
       answers[step.key] = value;
+      postParent("progress");
       document.getElementById("userInput").value = "";
       appendUserMessage(value, currentStepIdx);
       if (editReturn) {
@@ -607,6 +659,29 @@
       ].join("\n");
     }
 
+    // 매물 사이트 안(도우미)에서 끝났을 때: 요약 + '맞는 매물 보기' 버튼 → 시트 닫고 목록으로
+    async function finishEmbedded(delay) {
+      isCompleted = true;
+      updateProgress();
+      document.getElementById("inputArea").classList.add("hidden");
+      const old = document.getElementById("summaryCard");
+      if (old) old.remove();
+      postParent("progress");
+      await appendBotMessage("조건 정리 끝! 🎉\n뒤의 매물 목록에 <b>모두 적용</b>해 뒀어요. 마음에 드는 매물을 <b>♡ 담기</b> 한 뒤 <b>'중개사에게 보내기'</b>를 누르시면 이 조건도 함께 전달돼요.", delay);
+      const card = document.createElement("div");
+      card.id = "summaryCard";
+      card.className = "msg-anim bg-white rounded-3xl border border-sky-200 shadow-md p-4 space-y-3";
+      card.innerHTML = `
+        <pre class="text-xs text-slate-700 bg-sky-50/80 p-3 rounded-2xl border border-sky-100 whitespace-pre-wrap break-words font-sans leading-relaxed">${escapeHtml(buildFormattedSummaryText().split("\n").slice(1).join("\n"))}</pre>
+        <button type="button" onclick="postParent('done')"
+          class="w-full py-4 rounded-2xl bg-slate-900 text-white font-extrabold text-[15px] flex items-center justify-center gap-2 shadow-md active:scale-[0.99] transition">
+          <i class="ph-fill ph-house-line text-xl text-sky-300"></i>맞는 매물 <span id="embedDoneCount">${lastMatchCount ?? ""}</span>개 보러가기
+        </button>
+        <p class="text-[11px] text-slate-400 text-center">조건을 바꾸려면 위 답변의 '수정하기'를 눌러주세요</p>`;
+      document.getElementById("chatContainer").appendChild(card);
+      scrollToBottom();
+    }
+
     // 챗봇 답변을 매물 사이트 주소에 담아서 넘김 → 매물 사이트가 조건을 자동으로 필터에 적용
     function buildListingHref() {
       const base = CONFIG.LISTING_SITE_URL;
@@ -614,6 +689,7 @@
     }
 
     async function finishConversation(delay = 250) {
+      if (EMBED) return finishEmbedded(delay);
       isCompleted = true;
       updateProgress();
       document.getElementById("inputArea").classList.add("hidden");
