@@ -164,6 +164,11 @@
           </button>
         </div>
 
+        <button type="button" id="skipBtn" onclick="skipRest()"
+          class="hidden w-full py-2 rounded-xl bg-slate-900 text-white text-xs font-extrabold items-center justify-center gap-1.5 shadow-sm active:scale-[0.99] transition">
+          나머지 건너뛰고 매물 보기 <span id="skipCount" class="text-emerald-300"></span> <i class="ph-bold ph-arrow-right"></i>
+        </button>
+
         <form id="chatForm" onsubmit="handleFormSubmit(event)" class="flex items-center gap-2">
           <button type="button" id="prevStepBtn" onclick="goPrevStep()" title="이전 질문으로"
             class="hidden shrink-0 w-10 h-10 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition">
@@ -211,6 +216,7 @@
 
   <script>
     // ================= 챗봇 질문 시나리오 (11단계) =================
+    // 매물 수에 영향을 주는 질문(구조·보증금·월세·반려동물)을 먼저 묻고, 나머지는 건너뛸 수 있음
     const STEPS = [
       {
         key: "structure",
@@ -218,13 +224,6 @@
         question: "먼저, 어떤 <b>구조(방 개수)</b>의 집을 찾고 계신가요? 🏠",
         placeholder: "예: 원룸, 투룸, 복층 오피스텔 등 직접 입력",
         chips: ["원룸", "투룸", "쓰리룸", "오피스텔", "아파트", "상가"]
-      },
-      {
-        key: "moveInDate",
-        label: "입주예정일",
-        question: "희망하시는 <b>입주예정일</b>은 언제쯤인가요? 📅",
-        placeholder: "예: 12월 중순, 즉시 입주 등 직접 입력",
-        chips: ["즉시 입주", "1개월 이내", "2~3개월 후", "날짜 협의 가능"]
       },
       {
         key: "deposit",
@@ -241,18 +240,11 @@
         chips: ["전세/매매 희망", "50만원 이하", "50~80만원", "80~120만원", "120만원 이상"]
       },
       {
-        key: "adminFee",
-        label: "관리비(포함/별도)",
-        question: "<b>관리비(포함 또는 별도 여부)</b>에 대해 선호하시는 조건이 있나요?",
-        placeholder: "예: 관리비 포함 70 이하, 별도 10만 이하 등",
-        chips: ["관리비 포함 희망", "별도 무관 (10만 이하)", "상관없음"]
-      },
-      {
-        key: "location",
-        label: "찾으시는 위치",
-        question: "<b>찾으시는 위치(지역/역세권)</b>를 알려주세요! 📍",
-        placeholder: "예: 역삼역 도보 10분 이내, 수지구청역 인근 등",
-        chips: ["지하철 역세권 도보 10분 이내", "조용한 주택가/공원 인근", "직장·학교 근처 (지역 직접입력)"]
+        key: "pet",
+        label: "반려동물 여부",
+        question: "함께 거주할 <b>반려동물 여부</b>를 알려주세요! 🐾",
+        placeholder: "예: 소형견 1마리, 고양이 2마리, 없음 등",
+        chips: ["없음", "강아지 1마리", "고양이 1마리", "기타 / 다견·다묘"]
       },
       {
         key: "parking",
@@ -262,11 +254,25 @@
         chips: ["주차 불필요", "필요 (승용차)", "필요 (SUV/대형)", "경차"]
       },
       {
-        key: "pet",
-        label: "반려동물 여부",
-        question: "함께 거주할 <b>반려동물 여부</b>를 알려주세요! 🐾",
-        placeholder: "예: 소형견 1마리, 고양이 2마리, 없음 등",
-        chips: ["없음", "강아지 1마리", "고양이 1마리", "기타 / 다견·다묘"]
+        key: "location",
+        label: "찾으시는 위치",
+        question: "<b>찾으시는 위치(지역/역세권)</b>를 알려주세요! 📍",
+        placeholder: "예: 역삼역 도보 10분 이내, 수지구청역 인근 등",
+        chips: ["지하철 역세권 도보 10분 이내", "조용한 주택가/공원 인근", "직장·학교 근처 (지역 직접입력)"]
+      },
+      {
+        key: "moveInDate",
+        label: "입주예정일",
+        question: "희망하시는 <b>입주예정일</b>은 언제쯤인가요? 📅",
+        placeholder: "예: 12월 중순, 즉시 입주 등 직접 입력",
+        chips: ["즉시 입주", "1개월 이내", "2~3개월 후", "날짜 협의 가능"]
+      },
+      {
+        key: "adminFee",
+        label: "관리비(포함/별도)",
+        question: "<b>관리비(포함 또는 별도 여부)</b>에 대해 선호하시는 조건이 있나요?",
+        placeholder: "예: 관리비 포함 70 이하, 별도 10만 이하 등",
+        chips: ["관리비 포함 희망", "별도 무관 (10만 이하)", "상관없음"]
       },
       {
         key: "options",
@@ -291,6 +297,7 @@
         chips: ["이번 주 평일", "이번 주 주말", "언제든 가능 (시간 협의)"]
       }
     ];
+    const SKIP_FROM = 4;   // 4번째 질문까지 답하면 '건너뛰고 매물 보기' 표시 (매물 사이트 안에서만)
 
     // ================= 내장 브라우저(카톡/인스타 안) 감지 =================
     const UA = navigator.userAgent;
@@ -313,8 +320,10 @@
         pill.textContent = `맞는 매물 ${e.data.n}개`;
         pill.classList.toggle("hidden", !Object.keys(answers).length);
         pill.className = pill.className.replace(/bg-\S+ text-\S+/, e.data.n ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700");
-        const btnN = document.getElementById("embedDoneCount");
-        if (btnN) btnN.textContent = e.data.n;
+        const sc = document.getElementById("skipCount");
+        if (sc) sc.textContent = `(${e.data.n}개)`;
+        const btnN = document.getElementById("embedDoneLabel");
+        if (btnN) btnN.textContent = doneLabel(e.data.n);
       }
       // 매물 화면에 이미 적용된 조건이 있으면 불러와서 바로 수정할 수 있게
       if (e.data.type === "prefill" && e.data.answers && currentStepIdx === -1 && !Object.keys(answers).length) {
@@ -394,6 +403,10 @@
           ? "맞춤 매물 조건 접수 준비"
           : `${(STEPS[currentStepIdx] || {}).label || ""} 입력 중`;
 
+      const skipBtn = document.getElementById("skipBtn");
+      const canSkip = EMBED && !isCompleted && currentStepIdx >= SKIP_FROM && currentStepIdx < STEPS.length;
+      skipBtn.classList.toggle("hidden", !canSkip);
+      skipBtn.classList.toggle("flex", canSkip);
       const prevBtn = document.getElementById("prevStepBtn");
       if (currentStepIdx > 0 && !isCompleted) {
         prevBtn.classList.remove("hidden");
@@ -659,6 +672,24 @@
       ].join("\n");
     }
 
+    const doneLabel = n => n === 0 ? "조건 넓히기 제안 보러가기" : `맞는 매물 ${n ?? ""}개 보러가기`;
+    function skipRest() {
+      if (isCompleted) return;
+      appendUserMessage("나머지 질문은 건너뛸게요");
+      goToStep(STEPS.length);
+    }
+    // 건너뛴 질문을 이어서 답하기 (답하면 다음 빈 질문으로 이어짐)
+    function resumeSkipped() {
+      const first = STEPS.findIndex(st => !answers[st.key]);
+      if (first < 0) return;
+      isCompleted = false;
+      editReturn = true;
+      document.getElementById("inputArea").classList.remove("hidden");
+      document.getElementById("summaryCard")?.remove();
+      appendUserMessage("건너뛴 질문도 답할게요");
+      goToStep(first);
+    }
+
     // 매물 사이트 안(도우미)에서 끝났을 때: 요약 + '맞는 매물 보기' 버튼 → 시트 닫고 목록으로
     async function finishEmbedded(delay) {
       isCompleted = true;
@@ -667,16 +698,19 @@
       const old = document.getElementById("summaryCard");
       if (old) old.remove();
       postParent("progress");
-      await appendBotMessage("조건 정리 끝! 🎉\n뒤의 매물 목록에 <b>모두 적용</b>해 뒀어요. 마음에 드는 매물을 <b>♡ 담기</b> 한 뒤 <b>'중개사에게 보내기'</b>를 누르시면 이 조건도 함께 전달돼요.", delay);
+      await appendBotMessage(lastMatchCount === 0
+        ? "조건 정리 끝! 🎉\n지금 조건에 <b>딱 맞는 매물은 아직 없어요.</b> 매물 화면에서 <b>조금만 넓히면 몇 개가 더 나오는지</b> 알려드릴게요. 조건만 먼저 보내주셔도 맞는 매물이 생기면 연락드려요!"
+        : "조건 정리 끝! 🎉\n뒤의 매물 목록에 <b>모두 적용</b>해 뒀어요. 마음에 드는 매물을 <b>♡ 담기</b> 한 뒤 <b>'중개사에게 보내기'</b>를 누르시면 이 조건도 함께 전달돼요.", delay);
       const card = document.createElement("div");
       card.id = "summaryCard";
       card.className = "msg-anim bg-white rounded-3xl border border-sky-200 shadow-md p-4 space-y-3";
       card.innerHTML = `
-        <pre class="text-xs text-slate-700 bg-sky-50/80 p-3 rounded-2xl border border-sky-100 whitespace-pre-wrap break-words font-sans leading-relaxed">${escapeHtml(buildFormattedSummaryText().split("\n").slice(1).join("\n"))}</pre>
+        <pre class="text-xs text-slate-700 bg-sky-50/80 p-3 rounded-2xl border border-sky-100 whitespace-pre-wrap break-words font-sans leading-relaxed">${escapeHtml(buildFormattedSummaryText().split("\n").slice(1).filter(l => !/: -$/.test(l)).join("\n"))}</pre>
         <button type="button" onclick="postParent('done')"
           class="w-full py-4 rounded-2xl bg-slate-900 text-white font-extrabold text-[15px] flex items-center justify-center gap-2 shadow-md active:scale-[0.99] transition">
-          <i class="ph-fill ph-house-line text-xl text-sky-300"></i>맞는 매물 <span id="embedDoneCount">${lastMatchCount ?? ""}</span>개 보러가기
+          <i class="ph-fill ph-house-line text-xl text-sky-300"></i><span id="embedDoneLabel">${doneLabel(lastMatchCount)}</span>
         </button>
+        ${STEPS.some(st => !answers[st.key]) ? `<button type="button" onclick="resumeSkipped()" class="w-full py-2.5 rounded-xl bg-sky-50 border border-sky-200 text-[#0284C7] text-xs font-bold">건너뛴 질문 이어서 답하기 (방 볼 날짜 등)</button>` : ""}
         <p class="text-[11px] text-slate-400 text-center">조건을 바꾸려면 위 답변의 '수정하기'를 눌러주세요</p>`;
       document.getElementById("chatContainer").appendChild(card);
       scrollToBottom();

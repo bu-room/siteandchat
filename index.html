@@ -140,6 +140,8 @@ const CONFIG = {
 
   <!-- 챗봇에서 넘어온 조건 안내 배너 -->
   <div id="chatBanner" class="hidden mx-4 mt-4"></div>
+  <!-- 매물이 0~2개일 때: 조건을 조금 넓히면 몇 개 더 나오는지 제안 -->
+  <div id="relaxBox" class="hidden mx-4 mt-3"></div>
 
   <main id="list" class="px-4 py-4 space-y-5"></main>
 
@@ -218,6 +220,7 @@ const CONFIG = {
         <div class="text-xs font-bold text-slate-500 mb-1.5">보고 싶은 매물</div>
         <div id="sItems" class="space-y-2"></div>
       </div>
+      <div id="sView"></div>
       <div>
         <div class="text-xs font-bold text-slate-500 mb-1.5">희망 조건</div>
         <div id="sChat"></div>
@@ -359,7 +362,7 @@ function offerOk(o){
 function filtered(){const kw=F.kw.trim().toLowerCase();
   return all.filter(x=>{
     if(F.types.size&&!x.types.some(t=>F.types.has(t)))return false;
-    if(F.pet&&x.pet!=="가능")return false;
+    if(F.pet&&!(x.pet==="가능"||(F.petLoose&&x.pet==="협의")))return false;
     if(kw&&!(x.area+" "+x.memo+" "+x.type+" "+x.dir+" "+x.offers.map(o=>o.deal).join(" ")).toLowerCase().includes(kw))return false;
     return x.offers.some(offerOk)})}
 
@@ -413,11 +416,49 @@ function render(){
   if(!shown.length){const none=!all.length;$("emptyTitle").textContent=none?"등록된 매물이 없습니다":"조건에 맞는 매물이 없습니다";
     $("emptyDesc").textContent=none?"잠시 후 다시 확인해 주세요.":"금액 범위나 선택하신 거래 유형을 조금 넓혀서 다시 검색해 보세요.";$("resetEmpty").classList.toggle("hidden",none);
     if(CHAT_ON&&!none){$("emptyTitle").textContent="알려주신 조건에 딱 맞는 매물이 아직 없어요";
-      $("emptyDesc").innerHTML="조건을 넓혀서 보시거나, 조건만 먼저 보내주시면 맞는 매물이 나오는 대로 연락드릴게요.<br><button type='button' onclick='openSend()' class='mt-3 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold'>조건만 중개사에게 보내기</button>";
+      $("emptyDesc").innerHTML="위의 💡 제안으로 조건을 조금 넓혀 보시거나, 조건만 먼저 보내주시면 맞는 매물이 나오는 대로 연락드릴게요.<br><button type='button' onclick='openSend()' class='mt-3 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold'>조건만 중개사에게 보내기</button>";
       $("resetEmpty").textContent="조건 넓혀서 전체 매물 보기"}
     else $("resetEmpty").textContent="모든 필터 초기화하기"}
   document.querySelectorAll("#list article").forEach(bindCard);
-  summary();drawBanner();drawPickBar();
+  summary();drawBanner();drawPickBar();drawRelax();
+}
+
+/* ---------- 0~2개일 때 완화 제안: "보증금 1,500만까지 → 3개 더" ---------- */
+const activeCount=()=>filtered().filter(x=>!x.done).length;
+function tryWith(mod){
+  const save={deals:new Set(F.deals),types:new Set(F.types),pet:F.pet,petLoose:F.petLoose,kw:F.kw,depMin:F.depMin,depMax:F.depMax,rentMin:F.rentMin,rentMax:F.rentMax};
+  mod();const n=activeCount();Object.assign(F,save);return n;
+}
+function relaxOptions(base){
+  const out=[], live=all.filter(x=>!x.done), w=v=>{const t=won(v);return /억$/.test(t)?t:t+"만"};
+  const firstGain=(vals,set,label)=>{for(const v of vals.slice(0,40)){const n=tryWith(()=>set(v));if(n>base){out.push({label:label(v),n:n-base,apply:()=>set(v)});return}}};
+  if(F.depMax!=null)firstGain([...new Set(live.flatMap(x=>x.offers.map(o=>o.dep)).filter(v=>v>F.depMax))].sort((a,b)=>a-b),v=>F.depMax=v,v=>`보증금 ${w(v)}까지`);
+  if(F.rentMax!=null)firstGain([...new Set(live.flatMap(x=>x.offers.filter(o=>RENT_DEALS.includes(o.deal)).map(o=>o.rent)).filter(v=>v>F.rentMax))].sort((a,b)=>a-b),v=>F.rentMax=v,v=>`월세 ${w(v)}까지`);
+  if(F.rentMin!=null){const n=tryWith(()=>F.rentMin=null);if(n>base)out.push({label:"월세 최소 금액 없이",n:n-base,apply:()=>F.rentMin=null})}
+  if(F.depMin!=null){const n=tryWith(()=>F.depMin=null);if(n>base)out.push({label:"보증금 최소 금액 없이",n:n-base,apply:()=>F.depMin=null})}
+  if(F.pet&&!F.petLoose){const n=tryWith(()=>F.petLoose=true);if(n>base)out.push({label:"반려동물 '협의' 매물도",n:n-base,apply:()=>F.petLoose=true})}
+  if(F.types.size){let best=null;TYPE_WORDS.filter(t=>!F.types.has(t)).forEach(t=>{const n=tryWith(()=>F.types.add(t));if(n>base&&(!best||n>best.n))best={t,n}});
+    if(best)out.push({label:`${best.t}도 같이`,n:best.n-base,apply:()=>F.types.add(best.t)})}
+  if(F.deals.size){const n=tryWith(()=>F.deals.clear());if(n>base)out.push({label:"다른 거래 유형도",n:n-base,apply:()=>F.deals.clear()})}
+  if(F.kw){const n=tryWith(()=>F.kw="");if(n>base)out.push({label:`검색어 '${F.kw}' 없이`,n:n-base,apply:()=>{F.kw="";$("kw").value="";$("kwClear").classList.add("hidden")}})}
+  return out.sort((a,b)=>b.n-a.n).slice(0,3);
+}
+let RELAX=[];
+function drawRelax(){
+  const box=$("relaxBox"), base=activeCount();
+  const filtersOn=F.types.size||F.deals.size||F.pet||F.kw||F.depMin!=null||F.depMax!=null||F.rentMin!=null||F.rentMax!=null;
+  RELAX=(all.length&&filtersOn&&base<3)?relaxOptions(base):[];
+  if(!RELAX.length){box.classList.add("hidden");box.innerHTML="";return}
+  box.classList.remove("hidden");
+  box.innerHTML=`<div class="p-3.5 rounded-2xl bg-amber-50 border border-amber-200">
+    <div class="text-xs font-extrabold text-amber-900 mb-2">💡 ${base?`지금 조건에 맞는 매물이 ${base}개뿐이에요.`:"지금 조건에 딱 맞는 매물은 없어요."} 조금만 넓히면</div>
+    <div class="space-y-1.5">${RELAX.map((r,i)=>`<button type="button" data-relax="${i}" class="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-white border border-amber-200 text-left active:scale-[0.99] transition">
+      <span class="text-xs font-bold text-slate-800">${esc(r.label)}</span><span class="shrink-0 text-xs font-extrabold text-emerald-700">+${r.n}개 더 보기</span></button>`).join("")}</div></div>`;
+  box.querySelectorAll("[data-relax]").forEach(b=>b.onclick=()=>{const r=RELAX[+b.dataset.relax];if(!r)return;r.apply();
+    ["depMin","depMax","rentMin","rentMax"].forEach(i=>$(i).value=F[i]??"");
+    drawTx();drawProp();drawPet();drawQuick();syncRent();render();
+    toast(`'${r.label}'(으)로 넓혔어요. 매물 ${activeCount()}개`);
+    $("chatBanner").scrollIntoView({behavior:"smooth",block:"start"})});
 }
 function bindCard(a){
   a.querySelectorAll("[data-open]").forEach(el=>el.onclick=()=>openModal(shown[+el.dataset.open]));
@@ -478,9 +519,9 @@ function drawTx(){
 function drawPet(){
   const b=$("petToggle");b.setAttribute("aria-pressed",F.pet);
   b.className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-2xl border text-xs font-bold transition-all "+(F.pet?"bg-emerald-700 text-white border-emerald-700 shadow-sm":"bg-white text-slate-600 border-slate-200 hover:bg-emerald-50");
-  b.textContent=F.pet?"🐾 반려동물 가능만 보는 중 (누르면 해제)":"🐾 반려동물 가능만 보기";
+  b.textContent=F.pet?(F.petLoose?"🐾 반려동물 가능·협의 보는 중 (누르면 해제)":"🐾 반려동물 가능만 보는 중 (누르면 해제)"):"🐾 반려동물 가능만 보기";
 }
-$("petToggle").onclick=()=>{F.pet=!F.pet;drawPet();render()};
+$("petToggle").onclick=()=>{F.pet=!F.pet;F.petLoose=false;drawPet();render()};
 function drawProp(){
   $("propBox").innerHTML=TYPES.map(t=>`<button type="button" data-p="${t}" class="shrink-0 px-3.5 py-1.5 rounded-full text-xs transition-all ${(t==="전체"?!F.types.size:F.types.has(t))?'bg-wabang-600 text-white font-bold shadow-sm shadow-sky-200':'bg-slate-100 text-slate-600 font-semibold hover:bg-wabang-50'}">${t}</button>`).join("");
   $("propBox").querySelectorAll("button").forEach(b=>b.onclick=()=>{const t=b.dataset.p;if(t==="전체")F.types.clear();else F.types.has(t)?F.types.delete(t):F.types.add(t);drawProp();render()});
@@ -507,7 +548,7 @@ $("kwClear").onclick=()=>{$("kw").value="";F.kw="";$("kwClear").classList.add("h
 $("priceToggle").onclick=()=>{const hid=$("pricePanel").classList.toggle("hidden");$("chev").style.transform=hid?"":"rotate(180deg)"};
 function resetAll(){
   CHAT_ON=false;
-  F.deals.clear();F.types.clear();Object.assign(F,{pet:false,kw:"",depMin:null,depMax:null,rentMin:null,rentMax:null});
+  F.deals.clear();F.types.clear();Object.assign(F,{pet:false,petLoose:false,kw:"",depMin:null,depMax:null,rentMin:null,rentMax:null});
   ["kw","depMin","depMax","rentMin","rentMax"].forEach(i=>$(i).value="");$("kwClear").classList.add("hidden");
   syncRent();drawTx();drawProp();drawPet();drawQuick();render();
 }
@@ -573,7 +614,7 @@ function scoreItem(x){
 }
 function applyChat(){
   const a=CHAT||{},T=k=>String(a[k]||"");
-  F.deals.clear();F.types.clear();Object.assign(F,{pet:false,kw:"",depMin:null,depMax:null,rentMin:null,rentMax:null});
+  F.deals.clear();F.types.clear();Object.assign(F,{pet:false,petLoose:false,kw:"",depMin:null,depMax:null,rentMin:null,rentMax:null});
   TYPE_WORDS.forEach(w=>{if(T("structure").includes(w))F.types.add(w)});
   const mr=T("monthlyRent").replace(/\s/g,""), wantJ=/전세/.test(mr), wantS=/매매/.test(mr), dep=T("deposit");
   if(wantJ)F.deals.add("전세");if(wantS)F.deals.add("매매");
@@ -594,7 +635,7 @@ function drawBanner(){
     $("reChat").onclick=applyChat;return}
   const w=v=>{const s=won(v);return /억$/.test(s)?s:s+"만"};
   const r=(x,y)=>x==null&&y==null?"":x==null?`${w(y)} 이하`:y==null?`${w(x)} 이상`:`${w(x)}~${w(y)}`;
-  const chips=[...F.types,...F.deals,F.depMin!=null||F.depMax!=null?"보증금 "+r(F.depMin,F.depMax):"",F.rentMin!=null||F.rentMax!=null?"월세 "+r(F.rentMin,F.rentMax):"",F.pet?"🐾 반려동물 가능":""].filter(Boolean);
+  const chips=[...F.types,...F.deals,F.depMin!=null||F.depMax!=null?"보증금 "+r(F.depMin,F.depMax):"",F.rentMin!=null||F.rentMax!=null?"월세 "+r(F.rentMin,F.rentMax):"",F.pet?(F.petLoose?"🐾 반려동물 가능·협의":"🐾 반려동물 가능"):""].filter(Boolean);
   b.innerHTML=`<div class="p-3.5 rounded-2xl bg-gradient-to-r from-wabang-600 to-sky-500 text-white shadow-md shadow-sky-200">
     <div class="flex items-center justify-between gap-2 mb-2"><div class="text-sm font-extrabold flex items-center gap-1.5"><i class="ph-fill ph-paw-print text-lg"></i> 알려주신 조건에 맞는 매물</div>
       <div class="shrink-0 flex gap-1"><button type="button" onclick="openHelper()" class="text-[11px] font-bold bg-white text-wabang-600 px-2.5 py-1 rounded-full">조건 수정</button><button type="button" id="chatOff" class="text-[11px] font-bold bg-white/20 px-2.5 py-1 rounded-full">전체 보기</button></div></div>
@@ -635,7 +676,9 @@ function drawModalPick(){
 $("mPick").onclick=()=>curItem&&togglePick(curItem.id);
 
 const itemLink=x=>location.origin+location.pathname+"?item="+encodeURIComponent(x.id);
-function chatLines(){return CHAT?CHAT_LABELS.filter(([k])=>CHAT[k]).map(([k,l])=>`• ${l}: ${CHAT[k]}`):[]}
+let VIEW="";   // 도우미에서 건너뛴 경우 보내기 창에서 고르는 '방 볼 수 있는 날'
+const getChat=()=>{const c=Object.assign({},CHAT||{});if(VIEW&&!c.viewingDate)c.viewingDate=VIEW;return c};
+function chatLines(){const c=getChat();return CHAT_LABELS.filter(([k])=>c[k]).map(([k,l])=>`• ${l}: ${c[k]}`)}
 /* 중개사가 링크를 안 열어도 한눈에 판단할 수 있는 한 줄 요약: "전포동 투룸 · 500/55 · 3층 남향 · 🐾가능" */
 const dong=a=>{const p=String(a||"").trim().split(/\s+/);return p[p.length-1]||""};
 const shortPrice=o=>RENT_DEALS.includes(o.deal)?`${o.deal==="월세"?"":o.deal+" "}${won(o.dep)}/${won(o.rent)}`:`${o.deal} ${o.dep?won(o.dep):"문의"}`;
@@ -644,7 +687,7 @@ const itemShort=x=>[`${dong(x.area)} ${x.types[0]||x.type}`.trim(),x.offers.map(
 const condShort=c=>[c.structure,c.deposit&&"보증금 "+c.deposit,c.monthlyRent&&(/전세|매매/.test(c.monthlyRent)?c.monthlyRent:"월세 "+c.monthlyRent),
   c.parking&&!/불필요/.test(c.parking)?"주차 "+c.parking.replace(/필요\s*/,""):"",c.pet&&!/없/.test(c.pet)?"🐾"+c.pet:"",c.location].filter(Boolean).join(" · ");
 function buildMsg(){
-  const N="①②③④⑤⑥⑦⑧⑨⑩", nm=$("sName").value.trim(), ph=$("sPhone").value.trim(), items=pickedItems(), c=CHAT||{};
+  const N="①②③④⑤⑥⑦⑧⑨⑩", nm=$("sName").value.trim(), ph=$("sPhone").value.trim(), items=pickedItems(), c=getChat();
   const L=[`🏠 [와방 문의] ${[nm,ph].filter(Boolean).join(" ")}`.trim()];
   if(c.viewingDate)L.push(`📅 방 보기: ${c.viewingDate}`);
   if(c.moveInDate)L.push(`🚚 입주: ${c.moveInDate}`);
@@ -665,6 +708,10 @@ function drawSend(){
     :`<p class="text-xs text-slate-500 p-3 rounded-xl bg-slate-50 border border-slate-100 leading-relaxed">담은 매물이 없어요. 매물 카드의 <b class="text-rose-500">♡ 담기</b>를 누르면 여기에 들어가요. 이대로 보내면 <b>희망 조건만</b> 전달돼요.</p>`;
   $("sItems").querySelectorAll("[data-unpick]").forEach(b=>b.onclick=()=>togglePick(b.dataset.unpick));
   const cl=chatLines();
+  const needView=!(CHAT&&CHAT.viewingDate);
+  $("sView").innerHTML=needView?`<div class="text-xs font-bold text-slate-500 mb-1.5">📅 방 보실 수 있는 날 <span class="font-normal text-slate-400">(고르시면 일정 잡기가 빨라요)</span></div>
+    <div class="flex flex-wrap gap-1.5">${["이번 주 평일","이번 주 주말","다음 주","언제든 가능"].map(v=>`<button type="button" data-view="${v}" class="px-3 py-1.5 rounded-full text-xs font-bold border ${VIEW===v?"bg-wabang-600 text-white border-wabang-600":"bg-white text-slate-600 border-slate-200"}">${v}</button>`).join("")}</div>`:"";
+  $("sView").querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>{VIEW=VIEW===b.dataset.view?"":b.dataset.view;drawSend()});
   $("sChat").innerHTML=cl.length?`<div class="text-[11px] text-slate-600 p-3 rounded-xl bg-slate-50 border border-slate-100 leading-relaxed whitespace-pre-line">${esc(cl.join("\n"))}</div>`
     :`<button type="button" onclick="closeSend();openHelper()" class="w-full flex items-center justify-center gap-1.5 p-3 rounded-xl bg-slate-50 border border-dashed border-slate-300 text-xs font-bold text-slate-600"><i class="ph-fill ph-paw-print text-wabang-600"></i> 와방 도우미로 희망 조건도 같이 보내기</button>`;
   updateSendLinks();
@@ -707,7 +754,7 @@ $("sDirect").onclick=async()=>{
   const items=pickedItems();
   const body=JSON.stringify({name:$("sName").value.trim(),phone:ph,
     items:items.map(x=>({id:x.id,type:x.type,area:x.area,short:itemShort(x),price:x.offers.map(priceText).join(" / "),link:itemLink(x)})),
-    chat:CHAT||{},message:buildMsg()});
+    chat:getChat(),message:buildMsg()});
   let no=null;
   try{
     const r=await fetch(CONFIG.INQUIRY_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body});
