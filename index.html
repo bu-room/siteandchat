@@ -208,6 +208,7 @@ const CONFIG = {
 <div id="sendModal" class="hidden fixed inset-0 z-[55] flex items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4" role="dialog" aria-modal="true" aria-label="중개사에게 보내기">
   <div class="absolute inset-0" id="sBack"></div>
   <div class="modal-animate relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl max-h-[92vh] flex flex-col z-10">
+    <div id="sDone" class="hidden absolute inset-0 z-20 bg-white flex-col justify-center gap-4 p-6 overflow-y-auto"></div>
     <div class="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
       <h3 class="text-base font-extrabold text-slate-900 flex items-center gap-1.5"><i class="ph-fill ph-paper-plane-tilt text-wabang-600"></i> 중개사에게 보내기</h3>
       <button id="sX" class="p-1.5 rounded-full bg-slate-100 text-slate-500" aria-label="닫기"><i class="ph-bold ph-x text-base"></i></button>
@@ -611,13 +612,24 @@ $("mPick").onclick=()=>curItem&&togglePick(curItem.id);
 
 const itemLink=x=>location.origin+location.pathname+"?item="+encodeURIComponent(x.id);
 function chatLines(){return CHAT?CHAT_LABELS.filter(([k])=>CHAT[k]).map(([k,l])=>`• ${l}: ${CHAT[k]}`):[]}
+/* 중개사가 링크를 안 열어도 한눈에 판단할 수 있는 한 줄 요약: "전포동 투룸 · 500/55 · 3층 남향 · 🐾가능" */
+const dong=a=>{const p=String(a||"").trim().split(/\s+/);return p[p.length-1]||""};
+const shortPrice=o=>RENT_DEALS.includes(o.deal)?`${o.deal==="월세"?"":o.deal+" "}${won(o.dep)}/${won(o.rent)}`:`${o.deal} ${o.dep?won(o.dep):"문의"}`;
+const itemShort=x=>[`${dong(x.area)} ${x.types[0]||x.type}`.trim(),x.offers.map(shortPrice).join(", "),
+  [floorText(x.floor),x.dir].filter(Boolean).join(" "),x.pet&&"🐾"+x.pet].filter(Boolean).join(" · ");
+const condShort=c=>[c.structure,c.deposit&&"보증금 "+c.deposit,c.monthlyRent&&(/전세|매매/.test(c.monthlyRent)?c.monthlyRent:"월세 "+c.monthlyRent),
+  c.parking&&!/불필요/.test(c.parking)?"주차 "+c.parking.replace(/필요\s*/,""):"",c.pet&&!/없/.test(c.pet)?"🐾"+c.pet:"",c.location].filter(Boolean).join(" · ");
 function buildMsg(){
-  const L=["[와방 · 매물 문의]"], nm=$("sName").value.trim(), ph=$("sPhone").value.trim(), items=pickedItems();
-  if(nm||ph)L.push(`• 문의자: ${[nm,ph].filter(Boolean).join(" / ")}`);
-  if(items.length){L.push("",`■ 보고 싶은 매물 (${items.length}개)`);
-    items.forEach((x,k)=>L.push(`${k+1}) [매물 #${x.id}] ${x.type} · ${x.area}`,`   ${x.offers.map(priceText).join(" / ")}${x.fee?` · 관리비 ${feeText(x.fee)}`:""}`,`   ${itemLink(x)}`))}
-  else L.push("","■ 마음에 드는 매물을 아직 못 찾아서 조건만 먼저 보내요");
-  const cl=chatLines();if(cl.length)L.push("","■ 희망 조건 (챗봇 접수)",...cl);
+  const N="①②③④⑤⑥⑦⑧⑨⑩", nm=$("sName").value.trim(), ph=$("sPhone").value.trim(), items=pickedItems(), c=CHAT||{};
+  const L=[`🏠 [와방 문의] ${[nm,ph].filter(Boolean).join(" ")}`.trim()];
+  if(c.viewingDate)L.push(`📅 방 보기: ${c.viewingDate}`);
+  if(c.moveInDate)L.push(`🚚 입주: ${c.moveInDate}`);
+  if(items.length){L.push(`❤️ 고른 매물 ${items.length}개`);items.forEach((x,k)=>L.push(`${N[k]||k+1+"."} #${x.id} ${itemShort(x)}`))}
+  else L.push("❤️ 고른 매물 없음 (조건만 먼저 보내요)");
+  const cs=condShort(c);if(cs)L.push("💬 "+cs);
+  const rest=CHAT_LABELS.filter(([k])=>c[k]&&["options","priority","adminFee"].includes(k)).map(([k,l])=>`• ${l}: ${c[k]}`);
+  if(rest.length)L.push("",...rest);
+  if(items.length)L.push("","🔗 매물 사진 보기",...items.map(x=>`#${x.id} ${itemLink(x)}`));
   return L.join("\n");
 }
 function drawSend(){
@@ -644,7 +656,7 @@ function updateSendLinks(){
   $("sSms").href=`sms:${(CONFIG.PHONE||"").replace(/[^0-9+]/g,"")}${IS_IOS?"&":"?"}body=${encodeURIComponent(msg)}`;
   $("sDirect").classList.toggle("hidden",!CONFIG.INQUIRY_URL);
 }
-function openSend(){drawSend();$("sendModal").classList.remove("hidden");document.body.style.overflow="hidden"}
+function openSend(){$("sDone").classList.add("hidden");$("sDone").classList.remove("flex");drawSend();$("sendModal").classList.remove("hidden");document.body.style.overflow="hidden"}
 function closeSend(){$("sendModal").classList.add("hidden");if($("modal").classList.contains("hidden"))document.body.style.overflow=""}
 $("pickBtn").onclick=openSend;["sBack","sX"].forEach(id=>$(id).onclick=closeSend);
 ["sName","sPhone"].forEach(id=>$(id).addEventListener("input",updateSendLinks));
@@ -669,17 +681,36 @@ $("sDirect").onclick=async()=>{
   if(ph.replace(/[^0-9]/g,"").length<9){toast("연락받으실 번호를 입력해 주세요.");$("sPhone").focus();return}
   saveWho();const btn=$("sDirect");btn.disabled=true;$("sDirectText").textContent="전송 중...";
   const items=pickedItems();
+  const body=JSON.stringify({name:$("sName").value.trim(),phone:ph,
+    items:items.map(x=>({id:x.id,type:x.type,area:x.area,short:itemShort(x),price:x.offers.map(priceText).join(" / "),link:itemLink(x)})),
+    chat:CHAT||{},message:buildMsg()});
+  let no=null;
   try{
-    await fetch(CONFIG.INQUIRY_URL,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},
-      body:JSON.stringify({name:$("sName").value.trim(),phone:ph,
-        items:items.map(x=>({id:x.id,type:x.type,area:x.area,price:x.offers.map(priceText).join(" / "),link:itemLink(x)})),
-        chat:CHAT||{},message:buildMsg()})});
-    $("sDirectText").textContent="✓ 전송 완료! 곧 연락드릴게요";btn.classList.replace("bg-wabang-600","bg-emerald-600");
-    toast("중개사에게 전송됐어요! 확인 후 바로 연락드릴게요.");
-    picks.clear();savePicks();render();
-    setTimeout(()=>{closeSend();btn.disabled=false;$("sDirectText").textContent="중개사에게 바로 전송";btn.classList.replace("bg-emerald-600","bg-wabang-600")},2200);
-  }catch(e){btn.disabled=false;$("sDirectText").textContent="중개사에게 바로 전송";toast("전송이 안 됐어요. 아래 카톡/문자로 보내주세요.")}
+    const r=await fetch(CONFIG.INQUIRY_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body});
+    let j=null;try{j=await r.json()}catch(e){}
+    if(j&&j.ok===false)throw new Error(j.error||"서버 오류");
+    no=j&&j.id;
+  }catch(e){btn.disabled=false;$("sDirectText").textContent="중개사에게 바로 전송";toast("전송이 안 됐어요. 아래 카톡/문자로 보내주세요.");return}
+  showDone(no,items);
+  picks.clear();savePicks();render();
+  btn.disabled=false;$("sDirectText").textContent="중개사에게 바로 전송";
 };
+/* 손님용 접수 확인 화면 */
+function showDone(no,items){
+  const box=$("sDone");
+  box.innerHTML=`<div class="w-16 h-16 rounded-3xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto text-3xl"><i class="ph-fill ph-check-circle"></i></div>
+    <div class="text-center space-y-1"><div class="text-lg font-extrabold text-slate-900">문의가 접수됐어요!</div>
+      ${no?`<div class="text-sm font-bold text-wabang-600">접수번호 #${esc(no)}</div>`:""}</div>
+    <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4 text-xs text-slate-600 leading-relaxed space-y-1.5 break-keep">
+      <p>📞 중개사가 확인하는 대로 <b>${esc($("sPhone").value.trim())}</b>(으)로 연락드려요.</p>
+      ${items.length?`<p>❤️ 고르신 매물 ${items.length}개(${items.map(x=>"#"+esc(x.id)).join(", ")})를 보실 수 있게 준비해 둘게요.</p>`:`<p>💬 보내주신 조건에 맞는 매물을 찾아서 연락드릴게요.</p>`}
+      <p>🏠 혹시 그사이 거래가 끝난 매물이 있으면 비슷한 매물로 추천해 드려요.</p>
+    </div>
+    <button type="button" id="sDoneMore" class="w-full py-3.5 rounded-2xl bg-wabang-600 text-white text-sm font-extrabold">매물 더 둘러보기</button>
+    <a href="tel:${esc((CONFIG.PHONE||"").replace(/[^0-9+]/g,""))}" class="block text-center text-xs font-bold text-slate-500 underline">급하시면 바로 전화하기</a>`;
+  box.classList.remove("hidden");box.classList.add("flex");
+  $("sDoneMore").onclick=()=>{box.classList.add("hidden");box.classList.remove("flex");closeSend()};
+}
 function toast(m){const t=$("toast");t.textContent=m;t.classList.remove("hidden");clearTimeout(window.__tt);window.__tt=setTimeout(()=>t.classList.add("hidden"),3200)}
 
 load();
