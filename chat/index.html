@@ -5,9 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="robots" content="noindex, nofollow" />
   <title>와방 | 공인중개사 이하늘 - 자동 매물 접수 챗봇</title>
-
-  <!-- Pretendard 폰트 & Tailwind CSS & Phosphor Icons -->
-  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css" />
@@ -18,7 +15,7 @@
       tailwind.config = {
         theme: {
           extend: {
-            fontFamily: { sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'] },
+            fontFamily: { sans: ['-apple-system','BlinkMacSystemFont','Apple SD Gothic Neo','Malgun Gothic','맑은 고딕','Noto Sans KR','Roboto','Helvetica Neue','Segoe UI','sans-serif'] },
             colors: {
               brand: {
                 50: '#F0F9FF',
@@ -73,7 +70,9 @@
     }
     .typing-dot:nth-child(1) { animation-delay: -0.32s; }
     .typing-dot:nth-child(2) { animation-delay: -0.16s; }
-  </style>
+    /* 기기 기본 한글 글꼴: 아이폰·맥(애플 SD 고딕) / 갤럭시(삼성 기본·Noto) / 윈도우(맑은 고딕) */
+  html,body,button,input,textarea,select{font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","맑은 고딕","Noto Sans KR",Roboto,"Helvetica Neue","Segoe UI",sans-serif}
+</style>
 </head>
 <body class="app-h flex justify-center overflow-hidden">
 
@@ -81,9 +80,6 @@
   <script>
     const CONFIG = {
       PHONE: "010-4445-6432",                                   // 중개사 휴대폰 번호
-      KAKAO_OPENCHAT_URL: "https://open.kakao.com/o/sPQtqVTi",   // 오픈카카오톡 1:1 채팅 링크
-      INSTAGRAM_DM_URL: "https://www.instagram.com/_u/bu_room/", // 인스타 앱의 @bu_room 프로필로 바로 열기 (프로필에서 '메시지')
-      INSTAGRAM_WEB_URL: "https://www.instagram.com/bu_room/",      // 컴퓨터(앱 없음)에서 열 일반 프로필 주소
       LISTING_SITE_URL: "https://bu-room.github.io/siteandchat/", // 와방 매물 보는 사이트 주소
       // 매물 시트 CSV (동네 버튼을 자동으로 만들 때 사용, 매물 사이트와 같은 주소)
       CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQvtWYASv36tk8-2ThheDiPSkCHeN_nc4FD99PDb5YFlMMKw_h9dGGMPadjPbUxKpu9zfuf8Tj3QJLY/pub?gid=2138382865&single=true&output=csv"
@@ -247,7 +243,7 @@
         question: "<b>꼭 필요한 조건</b>을 모두 골라주세요 ✨ <span class='text-xs text-slate-400 font-normal'>(여러 개 가능)</span>",
         placeholder: "그 밖에 꼭 필요한 조건이 있으면 적어주세요",
         multiSelect: true,
-        chips: ["🐶 강아지", "🐱 고양이", "🚗 주차", "풀옵션", "엘리베이터", "역세권", "신축급", "없어요"]
+        chips: ["🐶 강아지", "🐱 고양이", "🚗 주차", "풀옵션", "역세권", "신축급", "없어요"]
       },
       {
         key: "location",
@@ -352,8 +348,7 @@
     }
 
     function buildInAppNotice() {
-      if (EMBED) return "";
-      if (!(IS_IOS && IN_APP)) return "";
+      return "";   // 복사·붙여넣기를 더 이상 쓰지 않아서 카톡/인스타 안 브라우저 경고 불필요
       const href = "kakaotalk://web/openExternal?url=" + encodeURIComponent(location.href.split("#")[0]);
       return `\n\n<div class='mt-2 rounded-xl bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-800 leading-snug break-keep'><b>⚠️ 먼저 확인해 주세요!</b><br/>지금 카톡/인스타 안에서 열려 있어요. 이 상태로는 마지막에 앱 이동·복사가 안 될 수 있고, 나중에 다시 열면 입력한 내용이 사라져요.<br/>${IN_KAKAO ? `<a href='${href}' class='mt-2 block text-center py-2 rounded-lg bg-amber-500 text-white font-extrabold'>기본 브라우저(Safari)로 다시 열기</a>` : "<b>화면 아래(또는 위)의 ⋯ → 'Safari로 열기'</b>를 눌러 다시 열어주세요."}</div>`;
     }
@@ -730,118 +725,34 @@
 
       const thanksEl = await appendBotMessage(
         again
-          ? "수정하신 내용으로 다시 정리했어요! 아래 버튼으로 문의를 보내주세요. ✅"
-          : "감사합니다! 알려주신 희망 조건이 모두 정리되었습니다. 🎉\n\n아래 <b>'내 조건에 맞는 매물 보기'</b>를 누르시면 조건에 맞는 매물만 골라서 보여드려요. 마음에 드는 매물을 <b>♡ 담기</b> 하신 뒤 바로 중개사에게 보내주세요!\n\n<span class='text-xs text-slate-500'>매물 보기 전에 조건만 먼저 보내셔도 돼요 (아래 카카오톡·인스타 버튼).</span>",
+          ? "수정하신 내용으로 다시 정리했어요! ✅"
+          : "정리 끝! 🎉\n아래 버튼을 누르면 <b>조건에 맞는 매물만</b> 보여드려요. 마음에 드는 매물을 ♡ 담아서 중개사에게 보내주세요.",
         delay
       );
       const listingHref = buildListingHref();
       const headerLink = document.getElementById("headerListingLink");
       if (headerLink) headerLink.href = listingHref;
 
+      // 복사·붙여넣기 없이: 매물 보기(기본) / 문자로 조건만 보내기(번호·내용 자동 입력)
       const summaryText = buildFormattedSummaryText();
-      const phone = (CONFIG.PHONE || "").trim();
-      const isIOS = IS_IOS;
-      const canShare = typeof navigator.share === "function";
-      // 아이폰: target="_blank"로 새 탭을 열면 앱 전환 후 빈(흰색) 탭이 남아서 현재 탭에서 바로 이동
-      const linkAttrs = isIOS ? "" : 'target="_blank" rel="noopener noreferrer"';
-      const isMobile = isIOS || /Android/i.test(navigator.userAgent);
-      const instaHref = isMobile ? CONFIG.INSTAGRAM_DM_URL : CONFIG.INSTAGRAM_WEB_URL;
-      const smsSeparator = isIOS ? "&" : "?";
-      const smsHref = `sms:${phone}${smsSeparator}body=${encodeURIComponent(summaryText)}`;
+      const phone = (CONFIG.PHONE || "").replace(/[^0-9+]/g, "");
+      const smsHref = `sms:${phone}${IS_IOS ? "&" : "?"}body=${encodeURIComponent(summaryText)}`;
 
       const container = document.getElementById("chatContainer");
       const cardEl = document.createElement("div");
       cardEl.id = "summaryCard";
-      cardEl.className = "msg-anim bg-white rounded-3xl border border-sky-200 shadow-md overflow-hidden";
+      cardEl.className = "msg-anim bg-white rounded-3xl border border-sky-200 shadow-md p-4 space-y-3";
       cardEl.innerHTML = `
-        <div class="bg-gradient-to-r from-[#0284C7] to-sky-500 px-4 py-3.5 text-white flex items-center justify-between gap-2">
-          <div class="flex items-center gap-2 font-extrabold text-sm min-w-0">
-            <i class="ph-fill ph-clipboard-text text-lg shrink-0"></i>
-            <span class="leading-snug break-keep">접수된 희망 조건</span>
-          </div>
-          <button type="button" onclick="restartChat()" class="text-[11px] bg-white/20 hover:bg-white/30 px-2.5 py-1 rounded-full font-bold transition whitespace-nowrap shrink-0">
-            처음부터 다시
-          </button>
-        </div>
-
-        <div class="p-3 min-[380px]:p-4 space-y-3">
-          <pre id="summaryPre" class="text-xs text-slate-700 bg-sky-50/80 p-3.5 rounded-2xl border border-sky-100 whitespace-pre-wrap break-words font-sans leading-relaxed select-all">${escapeHtml(summaryText)}</pre>
-
-          <!-- 복사 실패 시에만 나타나는 대체 방법 안내 -->
-          <div id="copyFail" class="hidden rounded-2xl bg-rose-50 border border-rose-200 p-3 text-[11px] leading-relaxed text-rose-800 break-keep">
-            <b>자동 복사가 안 됐어요. 아래 방법 중 하나를 써주세요.</b><br/>
-            ① 위 요약 박스를 <b>길게 눌러 → '복사'</b> (이미 전체가 선택되어 있어요)<br/>
-            ${canShare ? `② <button type="button" onclick="shareInquiry()" class="underline font-extrabold">공유 메뉴 열기</button> → <b>'복사'</b> 선택<br/>` : ""}
-            ${canShare ? "③" : "②"} 아래 <b>문자(SMS) 전송</b> 버튼 (내용이 문자창에 자동으로 채워져요)
-          </div>
-
-          <!-- ★ 메인: 조건을 담아 매물 사이트로 이동 -->
-          <a href="${escapeHtml(listingHref)}"
-            class="w-full px-3 py-4 leading-snug text-center rounded-2xl bg-slate-900 hover:bg-slate-800 active:scale-[0.99] text-white font-extrabold text-[15px] shadow-md flex items-center justify-center gap-2 transition">
-            <i class="ph-fill ph-house-line text-xl shrink-0 text-sky-300"></i>
-            <span class="break-keep">내 조건에 맞는 매물 보기</span>
-            <i class="ph-bold ph-arrow-right shrink-0"></i>
-          </a>
-          <p class="text-[11px] text-slate-500 text-center leading-snug break-keep -mt-1">매물을 고르고 <b>♡ 담기</b> → <b>중개사에게 보내기</b>를 누르면<br/>위 조건과 함께 바로 전달돼요</p>
-
-          <div class="flex items-center gap-2 pt-1">
-            <div class="flex-1 h-px bg-slate-200"></div>
-            <span class="text-[11px] font-bold text-slate-400">또는 조건만 먼저 보내기</span>
-            <div class="flex-1 h-px bg-slate-200"></div>
-          </div>
-
-          <div class="space-y-2.5 pt-1">
-            ${isIOS ? `<!-- 아이폰: ① 복사를 먼저 확실히 확인 -->
-            <button type="button" id="copyBtn" onclick="copyInquiry()"
-              class="w-full px-3 py-3.5 leading-snug text-center rounded-2xl bg-[#0284C7] hover:bg-sky-700 active:scale-[0.99] text-white font-extrabold text-sm shadow-sm flex items-center justify-center gap-2 transition">
-              <i class="ph-bold ph-copy text-lg shrink-0"></i>
-              <span id="copyBtnText" class="break-keep">① 문의 내용 복사하기</span>
-            </button>
-            <p class="text-[11px] font-bold text-slate-500 text-center">② 복사 후, 보낼 곳을 눌러 <b>붙여넣기</b> 해주세요</p>` : ""}
-            <!-- 누르면 문의 내용이 자동 복사되고 바로 이동 -->
-            <a href="${CONFIG.KAKAO_OPENCHAT_URL}" ${linkAttrs}
-              onclick="handleChannelLinkClick('kakao')"
-              class="w-full px-3 py-3.5 leading-snug text-center rounded-2xl bg-[#FEE500] hover:brightness-95 active:scale-[0.99] text-[#191919] font-extrabold text-sm shadow-sm flex items-center justify-center gap-2 transition">
-              <i class="ph-fill ph-chat-teardrop-text text-lg shrink-0"></i>
-              <span class="break-keep">💬 오픈카카오톡으로 문의 보내기</span>
-            </a>
-
-            <a href="${instaHref}" ${linkAttrs}
-              onclick="handleChannelLinkClick('insta')"
-              class="w-full px-3 py-3.5 leading-snug text-center rounded-2xl bg-gradient-to-r from-purple-600 via-pink-500 to-amber-500 hover:brightness-95 active:scale-[0.99] text-white font-extrabold text-sm shadow-sm flex items-center justify-center gap-2 transition">
-              <i class="ph-fill ph-instagram-logo text-lg shrink-0"></i>
-              <span class="break-keep">📩 인스타그램으로 문의 보내기</span>
-            </a>
-            ${isIOS ? `<p class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-2 text-center leading-snug break-keep">📱 붙여넣을 때 <b>'붙여넣기 허용'</b> 창이 뜨면 꼭 <b>허용</b>을 눌러주세요. 그래도 내용이 안 나오면 아래 <b>'문자(SMS) 전송'</b>을 쓰시면 내용이 자동으로 채워져요.</p>` : ""}
-            <p class="text-[11px] text-slate-400 text-center leading-snug break-keep">${isIOS ? "" : "누르면 문의 내용이 자동 복사돼요. "}인스타그램은 프로필이 열리면 <b>'메시지'</b> 버튼을 눌러 붙여넣어 주세요.<br/>앱이 안 열리면 아래 <b>'내용만 복사하기'</b>를 누른 뒤 앱을 직접 열어 붙여넣어도 돼요.</p>
-
-            <!-- 3. 보조 버튼: 내용만 복사 / 문자 전송 -->
-            <div class="grid grid-cols-2 gap-2 pt-0.5">
-              <button type="button" onclick="copyOnlyAndAskNext()"
-                class="px-2 py-3 rounded-2xl bg-sky-50 hover:bg-sky-100 text-[#0284C7] border border-sky-200 font-bold text-xs leading-tight flex items-center justify-center gap-1.5 transition">
-                <i class="ph-bold ph-copy text-sm shrink-0"></i>
-                <span>내용만 복사하기</span>
-              </button>
-
-              <a href="${smsHref}" onclick="setTimeout(() => showAfterSendModal('문자 앱으로 연결되었습니다!', '문자 앱에서 내용을 확인하고 전송해 주세요.'), 400)"
-                class="px-2 py-3 rounded-2xl bg-sky-50 hover:bg-sky-100 text-[#0284C7] border border-sky-200 font-bold text-xs leading-tight flex items-center justify-center gap-1.5 transition">
-                <i class="ph-bold ph-chat-circle-dots text-sm shrink-0"></i>
-                <span>문자(SMS) 전송</span>
-              </a>
-            </div>
-          </div>
-
-          <!-- 하단 바로가기 액션 -->
-          <div class="pt-3 mt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-            <a href="${escapeHtml(listingHref)}"
-              class="flex-1 py-2.5 rounded-xl bg-[#0284C7] hover:bg-sky-700 text-white text-xs font-extrabold flex items-center justify-center gap-1 transition">
-              <i class="ph-fill ph-house-line"></i>
-              <span>내 조건 매물 보러가기</span>
-            </a>
-          </div>
-        </div>
-      `;
-
+        <pre class="text-xs text-slate-700 bg-sky-50/80 p-3 rounded-2xl border border-sky-100 whitespace-pre-wrap break-words font-sans leading-relaxed">${escapeHtml(summaryText.split("\n").slice(1).filter(l => !/: -$/.test(l)).join("\n"))}</pre>
+        <a href="${escapeHtml(listingHref)}"
+          class="w-full py-4 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-[15px] flex items-center justify-center gap-2 shadow-md active:scale-[0.99] transition">
+          <i class="ph-fill ph-house-line text-xl text-sky-300"></i>내 조건에 맞는 매물 보기 <i class="ph-bold ph-arrow-right"></i>
+        </a>
+        <a href="${smsHref}"
+          class="w-full py-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 text-xs font-bold flex items-center justify-center gap-1.5">
+          <i class="ph-bold ph-chat-circle-dots"></i>매물 보기 전에 조건만 문자로 보내기
+        </a>
+        <button type="button" onclick="restartChat()" class="w-full text-[11px] text-slate-400 underline">처음부터 다시</button>`;
       container.appendChild(cardEl);
 
       // 요약 카드 맨 아래가 아니라, 위의 '감사합니다!' 안내 문구가 화면 맨 위에 보이도록 스크롤
@@ -851,114 +762,6 @@
         const gap = thanksEl.getBoundingClientRect().top - area.getBoundingClientRect().top;
         area.scrollTo({ top: area.scrollTop + gap - 8, behavior: "smooth" });
       }, 200);
-    }
-
-    // ================= 클립보드 복사 & 채널 연결 로직 =================
-    // 동기 복사: 터치 직후 바로 실행해야 아이폰이 허용함. execCommand 결과를 그대로 반환(거짓 성공 없음)
-    function legacyCopy(text) {
-      let ok = false;
-      try {
-        const ta = document.createElement("textarea");
-        ta.value = text;
-        ta.setAttribute("inputmode", "none");   // 키보드가 올라오지 않게
-        ta.contentEditable = "true";
-        ta.readOnly = false;
-        ta.style.cssText = "position:fixed;top:0;left:0;width:1px;height:1px;padding:0;border:0;opacity:0;font-size:16px;";
-        document.body.appendChild(ta);
-        const range = document.createRange();
-        range.selectNodeContents(ta);
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
-        ta.focus({ preventScroll: true });
-        ta.setSelectionRange(0, text.length);
-        ok = document.execCommand("copy");
-        sel.removeAllRanges();
-        document.body.removeChild(ta);
-      } catch (err) { ok = false; }
-      return ok;
-    }
-
-    // 링크 버튼용(페이지가 바로 넘어가므로 기다릴 수 없음): 동기 복사 결과만 신뢰, 최신 방식은 보조로 같이 호출
-    function copyTextToClipboard(text) {
-      const ok = legacyCopy(text);
-      try {
-        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).catch(() => {});
-      } catch (err) {}
-      return ok;
-    }
-
-    // 복사 버튼용: 실제 성공/실패를 확인해서 반환
-    async function copyTextVerified(text) {
-      if (copyTextToClipboard(text)) return true;           // 1) 동기 방식 (터치 직후라 가장 확실)
-      try {                                                  // 2) 최신 방식으로 재시도하고 결과 확인
-        await navigator.clipboard.writeText(text);
-        return true;
-      } catch (err) { return false; }
-    }
-
-    // 복사 실패 시: 대체 방법 안내 + 요약 박스 전체 선택
-    function showCopyFallback() {
-      const box = document.getElementById("copyFail");
-      if (box) box.classList.remove("hidden");
-      try {
-        const pre = document.getElementById("summaryPre");
-        const r = document.createRange(); r.selectNodeContents(pre);
-        const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
-        if (box) box.scrollIntoView({ block: "center", behavior: "smooth" });
-      } catch (err) {}
-    }
-
-    // 공유 메뉴(아이폰 기본 기능): 메뉴 안의 '복사'를 누르면 확실히 복사됨
-    async function shareInquiry() {
-      try { await navigator.share({ text: buildFormattedSummaryText() }); } catch (err) {}
-    }
-
-    // 아이폰용 ① 복사 버튼
-    async function copyInquiry() {
-      const ok = await copyTextVerified(buildFormattedSummaryText());
-      const btn = document.getElementById("copyBtn");
-      const txt = document.getElementById("copyBtnText");
-      const fail = document.getElementById("copyFail");
-      if (ok) {
-        if (fail) fail.classList.add("hidden");
-        if (btn && txt) {
-          txt.textContent = "✓ 복사 완료! 아래에서 보낼 곳을 눌러주세요";
-          btn.classList.remove("bg-[#0284C7]", "hover:bg-sky-700");
-          btn.classList.add("bg-emerald-600", "hover:bg-emerald-700");
-        }
-        showToast("문의 내용이 복사되었습니다! 이제 카톡/인스타에 붙여넣어 주세요.");
-      } else {
-        if (txt) txt.textContent = "① 문의 내용 복사하기";
-        showToast("자동 복사가 안 됐어요. 아래 안내를 따라 복사해 주세요.");
-        showCopyFallback();
-      }
-    }
-
-    function handleChannelLinkClick(channel) {
-      const ok = copyTextToClipboard(buildFormattedSummaryText());
-      const isInsta = channel === "insta";
-      showToast(
-        ok
-          ? (isInsta ? "문의 내용이 복사되었습니다! 프로필에서 '메시지'를 눌러 붙여넣기 해주세요."
-                     : "문의 내용이 복사되었습니다! 오픈카카오톡에 붙여넣기 해주세요.")
-          : "자동 복사가 안 됐을 수 있어요. 돌아와서 복사 방법을 확인해 주세요."
-      );
-      let desc = null;
-      if (!ok) { desc = "자동 복사가 되지 않았을 수 있어요. 이 화면으로 돌아와 '내용만 복사하기'를 누르거나 요약 박스를 길게 눌러 복사한 뒤 붙여넣어 주세요."; showCopyFallback(); }
-      else if (isInsta) desc = "인스타그램 프로필이 열리면 '메시지' 버튼을 눌러 DM 창에 붙여넣기(길게 누르기 → 붙여넣기) 후 전송해 주세요.";
-      setTimeout(() => showAfterSendModal(ok ? "문의 내용이 복사되었습니다!" : "복사를 확인해 주세요", desc), 300);
-    }
-
-    async function copyOnlyAndAskNext() {
-      const ok = await copyTextVerified(buildFormattedSummaryText());
-      if (ok) {
-        showToast("문의 내용이 복사되었습니다!");
-        showAfterSendModal("문의 내용이 복사되었습니다!");
-      } else {
-        showToast("자동 복사가 안 됐어요. 아래 안내를 따라 복사해 주세요.");
-        showCopyFallback();
-      }
     }
 
     // ================= 후속 행동 모달 =================
