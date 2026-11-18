@@ -249,10 +249,13 @@ const CONFIG = {
     </div>
     <div class="p-4 border-t border-slate-100 bg-white space-y-2" style="padding-bottom:max(1rem,env(safe-area-inset-bottom))">
       <button id="sDirect" type="button" class="hidden w-full py-3.5 rounded-2xl bg-wabang-600 hover:bg-wabang-dark text-white text-sm font-extrabold shadow-md shadow-sky-200 flex items-center justify-center gap-2"><i class="ph-fill ph-paper-plane-right text-lg"></i><span id="sDirectText">중개사에게 바로 보내기</span></button>
-      <!-- 휴대폰: 공유하기(카톡·인스타 등 채팅방 바로 선택) → 복사·붙여넣기 필요 없음 -->
-      <button type="button" id="sShare" class="hidden w-full py-3.5 rounded-2xl bg-[#FEE500] text-[#191919] text-sm font-extrabold items-center justify-center gap-2 shadow-md shadow-yellow-200"><i class="ph-bold ph-share-network text-lg"></i>카톡·인스타로 공유해서 보내기</button>
+      <!-- 큰 버튼은 오픈카톡 하나: 인스타 보고 처음 온 손님은 공유 창에 오픈카톡방이 없어서, 방을 바로 여는 오픈카톡이 가장 확실함 -->
       <button type="button" id="sKakao" class="w-full py-3.5 rounded-2xl bg-[#FEE500] text-[#191919] text-sm font-extrabold flex items-center justify-center gap-2 shadow-md shadow-yellow-200"><i class="ph-fill ph-chat-teardrop-text text-lg"></i>오픈카톡으로 보내기</button>
-      <div id="sRow" class="grid grid-cols-2 gap-2">
+      <!-- 나머지 방법은 접어 둠 (버튼이 많으면 고르는 것부터 부담) -->
+      <button type="button" id="sMore" class="w-full py-1 text-[11px] font-bold text-slate-400 flex items-center justify-center gap-1">다른 방법으로 보내기 <i id="sMoreIco" class="ph-bold ph-caret-down"></i></button>
+      <div id="sRow" class="hidden grid-cols-2 gap-2">
+        <!-- 휴대폰: 공유하기 (이미 대화한 적 있는 채팅방·인스타 DM으로 보낼 때 편함) -->
+        <button type="button" id="sShare" class="hidden py-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 text-xs font-bold items-center justify-center gap-1"><i class="ph-bold ph-share-network"></i>공유하기</button>
         <a id="sSms" class="py-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 text-xs font-bold flex items-center justify-center gap-1"><i class="ph-bold ph-chat-circle-dots"></i>문자로</a>
         <button type="button" id="sInsta" class="py-2.5 rounded-xl bg-wabang-50 border border-wabang-200 text-wabang-600 text-xs font-bold flex items-center justify-center gap-1"><i class="ph-bold ph-instagram-logo"></i>인스타 DM으로</button>
       </div>
@@ -776,9 +779,7 @@ function updateSendLinks(){
   $("sDirect").classList.toggle("hidden",!auto);
   $("sWho").classList.toggle("hidden",!auto);$("sWho").classList.toggle("grid",auto);
   $("sHint").innerHTML=(auto?"'바로 보내기'는 연락처만 꼭 적어주세요.<br>":"")
-    +(CAN_SHARE
-      ?"공유 창에서 <b>카카오톡 → 와방 오픈카톡방</b>을 고르면 끝이에요.<br>오픈카톡방에 처음이면 <b>'오픈카톡방'</b>을 눌러 먼저 들어와 주세요."
-      :"오픈카톡·인스타: 누르면 내용이 <b>복사</b>되고, 다음 화면에서 채팅방을 열어 <b>붙여넣기</b>만 하면 돼요.<br>문자는 내용이 자동으로 채워져요.");
+    +"누르면 내용이 <b>복사</b>되고, 다음 화면에서 오픈카톡을 열어 <b>붙여넣기</b> 후 전송하면 끝이에요.";
 }
 function openSend(){$("sDone").classList.add("hidden");$("sDone").classList.remove("flex");drawSend();$("sendModal").classList.remove("hidden");document.body.style.overflow="hidden"}
 function closeSend(){hideCopy();$("sendModal").classList.add("hidden");if($("modal").classList.contains("hidden"))document.body.style.overflow=""}
@@ -803,13 +804,14 @@ function copyNow(text){
 /* 공유하기 (휴대폰): 공유 창에서 카톡·인스타 등 채팅방을 고르면 글이 바로 들어감 */
 var CAN_SHARE=IS_MOBILE&&typeof navigator.share==="function";
 if(CAN_SHARE){
-  const sh=$("sShare"),k=$("sKakao"),row=$("sRow");
-  sh.classList.remove("hidden");sh.classList.add("flex");
-  // 오픈카톡 버튼은 '처음 오는 손님용'으로 작게, 문자·인스타와 한 줄에
-  k.className="py-2.5 rounded-xl bg-[#FEE500]/60 border border-yellow-300 text-[#191919] text-xs font-bold flex items-center justify-center gap-1";
-  k.innerHTML='<i class="ph-fill ph-chat-teardrop-text"></i>오픈카톡방';
-  row.prepend(k);row.classList.replace("grid-cols-2","grid-cols-3");
+  const sh=$("sShare");sh.classList.remove("hidden");sh.classList.add("flex");
+  $("sRow").classList.replace("grid-cols-2","grid-cols-3");
 }
+$("sMore").addEventListener("click",()=>{
+  const row=$("sRow"),open=row.classList.contains("hidden");
+  row.classList.toggle("hidden",!open);row.classList.toggle("grid",open);
+  $("sMoreIco").className="ph-bold "+(open?"ph-caret-up":"ph-caret-down");
+});
 $("sShare").addEventListener("click",()=>{
   saveWho();const msg=buildMsg();
   copyNow(msg); // 혹시 공유 앱이 글을 안 받아도 붙여넣기 할 수 있게 미리 복사
