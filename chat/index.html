@@ -82,6 +82,7 @@
       PHONE: "010-4445-6432",                                   // 중개사 휴대폰 번호
       LISTING_SITE_URL: "https://bu-room.github.io/siteandchat/", // 와방 매물 보는 사이트 주소
       // 매물 시트 CSV (동네 버튼을 자동으로 만들 때 사용, 매물 사이트와 같은 주소)
+      KAKAO_OPENCHAT_URL: "https://open.kakao.com/o/sPQtqVTi",   // 오픈카톡 (갤럭시·PC에서만 버튼 표시)
       CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQvtWYASv36tk8-2ThheDiPSkCHeN_nc4FD99PDb5YFlMMKw_h9dGGMPadjPbUxKpu9zfuf8Tj3QJLY/pub?gid=2138382865&single=true&output=csv"
     };
   </script>
@@ -681,6 +682,17 @@
       goToStep(first);
     }
 
+    // 갤럭시·PC: 조건을 복사한 뒤 오픈카톡으로 (아이폰은 버튼 자체를 숨김)
+    function copyForKakao() {
+      const text = buildFormattedSummaryText();
+      let ok = false;
+      try { const ta = document.createElement("textarea"); ta.value = text; ta.setAttribute("readonly", "");
+        ta.style.cssText = "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px;";
+        document.body.appendChild(ta); ta.select(); ok = document.execCommand("copy"); document.body.removeChild(ta); } catch (e) {}
+      try { navigator.clipboard && navigator.clipboard.writeText(text).catch(() => {}); } catch (e) {}
+      showToast(ok ? "조건이 복사됐어요! 오픈카톡 채팅창에 붙여넣기 해주세요." : "복사가 안 됐어요. '조건만 문자로'를 눌러주세요.");
+    }
+
     // 매물 사이트 안(도우미)에서 끝났을 때: 요약 + '맞는 매물 보기' 버튼 → 시트 닫고 목록으로
     async function finishEmbedded(delay) {
       isCompleted = true;
@@ -748,10 +760,15 @@
           class="w-full py-4 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-[15px] flex items-center justify-center gap-2 shadow-md active:scale-[0.99] transition">
           <i class="ph-fill ph-house-line text-xl text-sky-300"></i>내 조건에 맞는 매물 보기 <i class="ph-bold ph-arrow-right"></i>
         </a>
-        <a href="${smsHref}"
-          class="w-full py-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 text-xs font-bold flex items-center justify-center gap-1.5">
-          <i class="ph-bold ph-chat-circle-dots"></i>매물 보기 전에 조건만 문자로 보내기
-        </a>
+        <div class="grid ${IS_IOS ? "grid-cols-1" : "grid-cols-2"} gap-2">
+          <a href="${smsHref}"
+            class="py-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 text-xs font-bold flex items-center justify-center gap-1.5">
+            <i class="ph-bold ph-chat-circle-dots"></i>${IS_IOS ? "매물 보기 전에 조건만 문자로 보내기" : "조건만 문자로"}
+          </a>
+          ${IS_IOS ? "" : `<a href="${CONFIG.KAKAO_OPENCHAT_URL}" target="_blank" rel="noopener noreferrer" onclick="copyForKakao()"
+            class="py-2.5 rounded-xl bg-[#FEE500] text-[#191919] text-xs font-extrabold flex items-center justify-center gap-1.5">
+            <i class="ph-fill ph-chat-teardrop-text"></i>조건만 오픈카톡으로</a>`}
+        </div>
         <button type="button" onclick="restartChat()" class="w-full text-[11px] text-slate-400 underline">처음부터 다시</button>`;
       container.appendChild(cardEl);
 

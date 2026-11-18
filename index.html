@@ -54,6 +54,9 @@ const CONFIG = {
   SHOW_DONE: true,          // true: 거래완료 매물을 회색으로 표시 / false: 완전히 숨김
   /* ---- 손님 → 중개사 문의 보내기 ---- */
   CHATBOT_URL: "https://bu-room.github.io/siteandchat/chat/",          // 조건 접수 챗봇 주소
+  KAKAO_OPENCHAT_URL: "https://open.kakao.com/o/sPQtqVTi",    // 오픈카톡 (갤럭시·PC에서만 버튼 표시)
+  INSTAGRAM_DM_URL: "https://www.instagram.com/_u/bu_room/",  // 휴대폰: 인스타 앱 프로필
+  INSTAGRAM_WEB_URL: "https://www.instagram.com/bu_room/",    // 컴퓨터: 일반 프로필
   INQUIRY_URL: ""   // 구글 Apps Script 웹앱 주소를 넣으면 '중개사에게 바로 보내기'(자동 전송)가 기본 버튼이 돼요 (비워두면 문자로 전송)
 };
 /* ============================================================================ */
@@ -235,6 +238,11 @@ const CONFIG = {
     <div class="p-4 border-t border-slate-100 bg-white space-y-2" style="padding-bottom:max(1rem,env(safe-area-inset-bottom))">
       <button id="sDirect" type="button" class="hidden w-full py-3.5 rounded-2xl bg-wabang-600 hover:bg-wabang-dark text-white text-sm font-extrabold shadow-md shadow-sky-200 flex items-center justify-center gap-2"><i class="ph-fill ph-paper-plane-right text-lg"></i><span id="sDirectText">중개사에게 바로 보내기</span></button>
       <a id="sSms" class="w-full py-3.5 rounded-2xl text-sm font-extrabold flex items-center justify-center gap-2"><i class="ph-fill ph-chat-circle-dots text-lg"></i><span id="sSmsText">문자로 보내기</span></a>
+      <!-- 갤럭시·PC 전용: 아이폰은 웹페이지 복사가 막히는 경우가 많아 숨김 -->
+      <div id="sCopyRow" class="hidden grid-cols-2 gap-2">
+        <a id="sKakao" class="py-2.5 rounded-xl bg-[#FEE500] text-[#191919] text-xs font-extrabold flex items-center justify-center gap-1"><i class="ph-fill ph-chat-teardrop-text"></i>오픈카톡으로</a>
+        <a id="sInsta" class="py-2.5 rounded-xl bg-wabang-50 border border-wabang-200 text-wabang-600 text-xs font-bold flex items-center justify-center gap-1"><i class="ph-bold ph-instagram-logo"></i>인스타 DM으로</a>
+      </div>
       <p id="sHint" class="text-[11px] text-slate-400 text-center leading-snug break-keep"></p>
     </div>
   </div>
@@ -750,7 +758,13 @@ function updateSendLinks(){
     ?"py-2.5 text-xs bg-white border border-slate-200 text-slate-500"
     :"py-3.5 text-sm bg-wabang-600 text-white shadow-md shadow-sky-200");
   $("sSmsText").textContent=auto?"자동 전송이 안 되면 문자로 보내기":"문자로 중개사에게 보내기";
-  $("sHint").innerHTML=auto?"버튼 한 번이면 중개사에게 바로 전달돼요. 연락처만 꼭 적어주세요.":"문자 앱이 열리면서 내용이 <b>자동으로 채워져요.</b> 전송만 눌러주세요.";
+  $("sHint").innerHTML=(auto?"버튼 한 번이면 중개사에게 바로 전달돼요. 연락처만 꼭 적어주세요.":"문자 앱이 열리면서 내용이 <b>자동으로 채워져요.</b> 전송만 눌러주세요.")
+    +(IS_IOS?"":"<br>오픈카톡·인스타는 내용이 자동 복사돼요. 채팅창에 <b>붙여넣기</b>만 해주세요.");
+  // 갤럭시·PC: 복사 후 오픈카톡/인스타로 이동 (아이폰은 숨김)
+  $("sCopyRow").classList.toggle("hidden",IS_IOS);$("sCopyRow").classList.toggle("grid",!IS_IOS);
+  const tgt=a=>{a.setAttribute("target","_blank");a.setAttribute("rel","noopener noreferrer")};
+  $("sKakao").href=CONFIG.KAKAO_OPENCHAT_URL;tgt($("sKakao"));
+  $("sInsta").href=IS_MOBILE?CONFIG.INSTAGRAM_DM_URL:CONFIG.INSTAGRAM_WEB_URL;tgt($("sInsta"));
 }
 function openSend(){$("sDone").classList.add("hidden");$("sDone").classList.remove("flex");drawSend();$("sendModal").classList.remove("hidden");document.body.style.overflow="hidden"}
 function closeSend(){$("sendModal").classList.add("hidden");if($("modal").classList.contains("hidden"))document.body.style.overflow=""}
@@ -760,6 +774,13 @@ const savedWho=LS.get("wabang_who");if(savedWho){$("sName").value=savedWho.n||""
 const saveWho=()=>LS.set("wabang_who",{n:$("sName").value.trim(),p:$("sPhone").value.trim()});
 
 $("sSms").addEventListener("click",saveWho);
+/* 복사 (갤럭시·PC용): 터치 직후 바로 실행 */
+function copyNow(text){let ok=false;try{const ta=document.createElement("textarea");ta.value=text;ta.setAttribute("readonly","");
+  ta.style.cssText="position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px;";document.body.appendChild(ta);ta.select();
+  ok=document.execCommand("copy");document.body.removeChild(ta)}catch(e){ok=false}
+  try{navigator.clipboard&&navigator.clipboard.writeText(text).catch(()=>{})}catch(e){}return ok}
+$("sKakao").addEventListener("click",()=>{saveWho();toast(copyNow(buildMsg())?"내용이 복사됐어요! 오픈카톡 채팅창에 붙여넣기 해주세요.":"복사가 안 됐어요. 위 '문자로 보내기'를 눌러주세요.")});
+$("sInsta").addEventListener("click",()=>{saveWho();toast(copyNow(buildMsg())?"복사됐어요! 프로필의 '메시지'를 눌러 붙여넣기 해주세요.":"복사가 안 됐어요. 위 '문자로 보내기'를 눌러주세요.")});
 
 /* 자동 전송 (구글 Apps Script 웹앱 → 문의 시트 기록 + 중개사 카톡 알림) */
 $("sDirect").onclick=async()=>{
